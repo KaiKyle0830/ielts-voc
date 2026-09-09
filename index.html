@@ -82,15 +82,18 @@
 
   // 牌組切換
   const chips = $("#deckChips");
-  const decks = [{id:"all", name:"全部", icon:"📚"}].concat(allDecks());
+  // 空牌組不佔位子，但目前選中的那個一定顯示
+  const decks = [{id:"all", name:"全部", icon:"📚"}]
+    .concat(allDecks().filter(d => deckStats(d.id).total > 0 || d.id === deck));
   chips.innerHTML = decks.map(d =>
     `<button class="chip${d.id === deck ? " on" : ""}" data-id="${esc(d.id)}">${esc(d.icon)} ${esc(d.name)}</button>`
   ).join("");
   $$(".chip", chips).forEach(b => b.onclick = () => { setCurDeck(b.dataset.id); location.reload(); });
 
+  const ROUND = 20;                       // 一輪字卡的張數，和 cards.html 一致
   const st = deckStats(deck);
   $("#kTotal").textContent = st.total;
-  $("#kDue").textContent = st.due + st.neu;
+  $("#kDue").textContent = Math.min(st.due + st.neu, ROUND);
   $("#kLearned").textContent = st.learned;
 
   const n = streak();
@@ -103,7 +106,9 @@
 
   const todo = st.due + st.neu;
   $("#studyDesc").textContent = todo
-    ? `今天有 ${todo} 張要複習（新字 ${st.neu}）`
+    ? `這一輪 ${Math.min(todo, ROUND)} 張` +
+      (st.due ? `・到期複習 ${st.due}` : "") +
+      (st.neu ? `・還沒背過 ${st.neu}` : "")
     : (st.total ? "今天的複習都完成了，可以自由練習" : "滑開遮版看英文");
   $("#listDesc").textContent = st.total ? `${st.total} 個單字・${deckLabel(deck)}` : "看全部單字、例句與熟練度";
 
