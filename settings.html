@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>設定</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>⚙️ 設定</h1><div class="sub">備份、發音、進階選項</div></div>
+  </div>
+
+  <div class="card">
+    <b>📤 交給 Claude 處理</b>
+    <p class="muted small" style="margin:8px 0 12px;line-height:1.7">
+      把你在這裡加的單字整包複製起來，貼到 Claude Code 對話裡，
+      就能請它補例句、改中文，或永久寫進網站資料檔（換手機也不會不見）。
+    </p>
+    <button class="btn ghost" id="btnCopyWords">複製全部單字給 Claude</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" id="btnCopyMissing">只複製「缺例句」的字</button>
+  </div>
+
+  <div class="card">
+    <b>💾 備份與還原</b>
+    <p class="muted small" style="margin:8px 0 12px;line-height:1.7">
+      單字和學習進度都存在這台裝置的瀏覽器裡。清除瀏覽器資料會一起消失，記得偶爾備份。
+    </p>
+    <button class="btn ghost" id="btnExport">下載備份檔</button>
+    <div style="height:10px"></div>
+    <button class="btn ghost" id="btnImport">從備份檔還原</button>
+    <input type="file" id="file" accept=".json,application/json" class="hidden">
+    <div class="muted small" id="stat" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <b>🔊 發音</b>
+    <p class="muted small" style="margin:8px 0 12px;line-height:1.7">
+      用手機／電腦內建的英文語音。iPhone 開靜音時可能沒聲音。
+    </p>
+    <button class="btn ghost" id="btnTest">試聽一句</button>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary style="font-weight:700;cursor:pointer">🔑 進階：讓 App 自己生成（選配）</summary>
+      <p class="muted small" style="margin:10px 0;line-height:1.7">
+        平常不用填。填了 Anthropic API key 之後，「新增單字」頁會多一顆「直接自動生成」，
+        不用再複製貼上給 Claude。key 只存在這台裝置的瀏覽器，不會傳到別的地方。
+        <br>申請網址：<code>console.anthropic.com</code>
+      </p>
+      <label class="f">API key</label>
+      <input class="inp" id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+      <label class="f">模型</label>
+      <select class="inp" id="model"></select>
+      <div style="height:14px"></div>
+      <button class="btn ghost" id="btnSaveKey">儲存</button>
+      <div style="height:10px"></div>
+      <button class="btn danger" id="btnClearKey">清除 key</button>
+    </details>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary style="font-weight:700;cursor:pointer;color:var(--bad)">⚠️ 重置</summary>
+      <div style="height:12px"></div>
+      <button class="btn danger" id="btnResetProg">只清除學習進度（保留單字）</button>
+      <div style="height:10px"></div>
+      <button class="btn danger" id="btnResetAll">清除全部資料</button>
+    </details>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script src="js/ai.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const db = loadDB();
+  $("#stat").textContent = `目前有 ${db.words.length} 個單字、${db.decks.length} 個牌組、${db.quiz.length} 筆測驗紀錄`;
+
+  // ---- 交給 Claude ----
+  function wordsAsText(list){
+    const byDeck = {};
+    list.forEach(w => { (byDeck[w.deck] = byDeck[w.deck] || []).push(w); });
+    let out = "這是我單字 App 裡的單字（deck / en / pos / zh / ex / exZh / note）：\n\n";
+    Object.keys(byDeck).forEach(id => {
+      const d = findDeck(id);
+      out += `【${d ? d.icon + " " + d.name : id}】(deck id: ${id})\n`;
+      byDeck[id].forEach(w => {
+        out += `- ${w.en} | ${w.pos} | ${w.zh} | ${w.ex} | ${w.exZh} | ${w.note}\n`;
+      });
+      out += "\n";
+    });
+    return out;
+  }
+  $("#btnCopyWords").onclick = async () => {
+    const ws = allWords();
+    if (!ws.length){ toast("還沒有單字"); return; }
+    const ok = await copyText(wordsAsText(ws) +
+      "請幫我寫進 vocab-app/data/seed.js（記得把 SEED_VERSION 加 1）。");
+    toast(ok ? `已複製 ${ws.length} 個字` : "複製失敗");
+  };
+  $("#btnCopyMissing").onclick = async () => {
+    const ws = allWords().filter(w => !w.ex || !w.exZh || !w.zh);
+    if (!ws.length){ toast("每個字都有例句了 👍"); return; }
+    const ok = await copyText(wordsAsText(ws) +
+      "上面這些字缺中文或例句，請幫我補齊，並寫進 vocab-app/data/seed.js（SEED_VERSION 加 1）。");
+    toast(ok ? `已複製 ${ws.length} 個缺內容的字` : "複製失敗");
+  };
+
+  // ---- 備份 ----
+  $("#btnExport").onclick = () => {
+    const blob = new Blob([exportBackup()], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `我的單字本備份-${today()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $("#btnImport").onclick = () => $("#file").click();
+  $("#file").onchange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try { importBackup(r.result); toast("還原完成"); setTimeout(() => location.reload(), 900); }
+      catch(err){ toast("備份檔看起來不對：" + err.message); }
+    };
+    r.readAsText(f);
+  };
+
+  $("#btnTest").onclick = () => speak("This is how the pronunciation sounds.");
+
+  // ---- API key（選配）----
+  $("#model").innerHTML = AI_MODELS.map(m =>
+    `<option value="${m.id}">${esc(m.name)}</option>`).join("");
+  $("#apiKey").value = getApiKey();
+  $("#model").value = getModel();
+  $("#btnSaveKey").onclick = () => {
+    setSetting("apiKey", $("#apiKey").value.trim());
+    setSetting("model", $("#model").value);
+    toast("已儲存");
+  };
+  $("#btnClearKey").onclick = () => {
+    setSetting("apiKey", "");
+    $("#apiKey").value = "";
+    toast("已清除");
+  };
+
+  // ---- 重置 ----
+  $("#btnResetProg").onclick = () => {
+    if (!confirm("清除所有熟練度與測驗紀錄？單字會留著。")) return;
+    const d = loadDB(); d.prog = {}; d.quiz = []; saveDB(d);
+    toast("已清除進度"); setTimeout(() => location.reload(), 800);
+  };
+  $("#btnResetAll").onclick = () => {
+    if (!confirm("這會刪掉所有單字和進度，確定嗎？")) return;
+    if (!confirm("真的確定？建議先下載備份檔。")) return;
+    localStorage.removeItem(STORE_KEY);
+    toast("已清空"); setTimeout(() => location.href = "index.html", 800);
+  };
+})();
+</script>
+</body>
+</html>

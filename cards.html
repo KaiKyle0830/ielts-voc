@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>背字卡</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" id="backLink" href="index.html">‹</a>
+    <div><h1 id="title">🗂 背字卡</h1><div class="sub" id="subtitle"></div></div>
+  </div>
+
+  <div id="stage">
+    <div class="fc-count" id="counter"></div>
+    <div class="fc-stage">
+      <div class="fc-card" id="card">
+        <div class="fc-face">
+          <div class="fc-word" id="enWord"></div>
+          <div class="fc-pos" id="enPos"></div>
+          <button class="fc-speak" id="speakBtn" aria-label="發音">🔊</button>
+          <div class="fc-ex" id="enEx"></div>
+          <div class="fc-ex muted" id="enNote" style="font-size:.82rem"></div>
+        </div>
+        <div class="fc-mask" id="mask">
+          <div class="fc-word" id="zhWord"></div>
+          <div class="fc-pos" id="zhPos"></div>
+          <span class="knob"></span>
+          <div class="hint">← 把遮版往左滑，看英文</div>
+        </div>
+      </div>
+    </div>
+    <div class="fc-actions">
+      <button class="btn no" id="btnNo">✗ 不認識</button>
+      <button class="btn ok" id="btnFuzzy">～ 有點模糊</button>
+      <button class="btn yes" id="btnYes">✓ 記得</button>
+    </div>
+    <div class="muted small center" style="margin-top:12px" id="boxHint"></div>
+  </div>
+
+  <div id="done" class="hidden">
+    <div class="card center">
+      <div style="font-size:3rem">🎉</div>
+      <div class="score-big" id="doneStat"></div>
+      <div class="score-sub" id="doneSub"></div>
+      <button class="btn primary" id="btnAgain">再練不熟的</button>
+      <div style="height:10px"></div>
+      <a class="btn ghost" id="toMcq">去做選擇題</a>
+      <div style="height:10px"></div>
+      <a class="btn ghost" href="index.html">回首頁</a>
+    </div>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const deck = curDeck();
+  const suffix = deckParam(deck);
+  $("#backLink").href = "index.html";
+  $("#toMcq").href = "mcq.html" + suffix;
+  $("#subtitle").textContent = deckLabel(deck);
+
+  const LIMIT = 20;
+  let queue = dueWords(deck).slice(0, LIMIT);
+  const onlyHard = qs("hard") === "1";
+  if (onlyHard) queue = deckWords(deck).filter(w => getProg(w.en).box <= 1 && !isNew(w)).slice(0, LIMIT);
+  // 今天沒有到期的字就自由練習
+  let freeMode = false;
+  if (!queue.length){
+    queue = sampleN(deckWords(deck), LIMIT);
+    freeMode = queue.length > 0;
+  }
+
+  let cur = 0, good = 0, bad = 0, revealed = false;
+
+  if (!queue.length){
+    $("#stage").classList.add("hidden");
+    $("#done").classList.remove("hidden");
+    $("#doneStat").textContent = "還沒有單字";
+    $("#doneSub").textContent = "先去「新增單字」加幾個字吧";
+    $("#btnAgain").classList.add("hidden");
+    return;
+  }
+
+  // ---------- 遮版拖曳 ----------
+  const mask = $("#mask"), card = $("#card");
+  const PEEK = 36;
+  let startX = 0, baseX = 0, curX = 0, dragging = false, moved = false;
+  function maxSlide(){ return card.clientWidth - PEEK; }
+  function setX(x, anim){
+    curX = Math.min(0, Math.max(-maxSlide(), x));
+    mask.classList.toggle("anim", !!anim);
+    mask.style.transform = `translateX(${curX}px)`;
+  }
+  function open(anim=true){
+    setX(-maxSlide(), anim);
+    if (!revealed){ revealed = true; speak(queue[cur].en); }
+  }
+  function close(anim=true){ setX(0, anim); revealed = false; }
+  mask.addEventListener("pointerdown", e => {
+    dragging = true; moved = false;
+    startX = e.clientX; baseX = curX;
+    mask.setPointerCapture(e.pointerId);
+    mask.classList.remove("anim");
+  });
+  mask.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 6) moved = true;
+    setX(baseX + dx, false);
+  });
+  mask.addEventListener("pointerup", () => {
+    if (!dragging) return;
+    dragging = false;
+    if (!moved){ (curX < -maxSlide()/2) ? close() : open(); return; }
+    (curX < -maxSlide()*0.35) ? open() : close();
+  });
+  mask.addEventListener("pointercancel", () => {
+    dragging = false;
+    (curX < -maxSlide()*0.35) ? open() : close();
+  });
+
+  // ---------- 流程 ----------
+  const BOX_NAME = ["新字", "今天再看", "２天後", "４天後", "８天後", "熟了"];
+  function render(){
+    const w = queue[cur];
+    $("#counter").textContent = `${cur+1} / ${queue.length}` + (freeMode ? "・自由練習" : "");
+    $("#zhWord").textContent = w.zh || "（沒有中文）";
+    $("#zhPos").textContent  = w.pos || "";
+    $("#enWord").textContent = w.en;
+    $("#enPos").textContent  = w.pos || "";
+    $("#enEx").innerHTML = w.ex ? esc(w.ex) + (w.exZh ? `<span class="zh">${esc(w.exZh)}</span>` : "") : "";
+    $("#enNote").textContent = w.note || "";
+    const p = getProg(w.en);
+    $("#boxHint").textContent = isNew(w) ? "第一次看到這個字"
+      : `熟練度：${BOX_NAME[p.box]}・答對 ${p.right}／答錯 ${p.wrong}`;
+    close(false);
+  }
+  function mark(g){
+    grade(queue[cur].en, g);
+    if (g >= 2) good++; else bad++;
+    cur++;
+    if (cur >= queue.length) finish(); else render();
+  }
+  function finish(){
+    addQuizResult("cards", good, queue.length, deck);
+    $("#stage").classList.add("hidden");
+    $("#done").classList.remove("hidden");
+    $("#doneStat").textContent = `${good} ✓ / ${bad} ✗`;
+    $("#doneSub").textContent = bad ? `有 ${bad} 個字要再加強` : "這一輪全部記得，讚！";
+    if (!bad) $("#btnAgain").classList.add("hidden");
+  }
+  $("#btnYes").onclick   = () => mark(2);
+  $("#btnFuzzy").onclick = () => mark(1);
+  $("#btnNo").onclick    = () => mark(0);
+  $("#speakBtn").onclick = e => { e.stopPropagation(); speak(queue[cur].en); };
+  $("#btnAgain").onclick = () => location.href = "cards.html" + (suffix ? suffix + "&hard=1" : "?hard=1");
+  render();
+})();
+</script>
+</body>
+</html>

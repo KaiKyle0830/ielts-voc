@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>牌組管理</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>🗃 牌組管理</h1><div class="sub">分類你的單字</div></div>
+  </div>
+  <div class="card"><div id="list"></div></div>
+  <button class="btn primary" id="btnAdd">＋ 新增牌組</button>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  function render(){
+    const decks = allDecks();
+    $("#list").innerHTML = decks.length ? decks.map(d => {
+      const s = deckStats(d.id);
+      return `<div class="row">
+        <span style="font-size:1.4rem">${esc(d.icon)}</span>
+        <span><b>${esc(d.name)}</b><br><span class="muted small">${s.total} 字・熟記 ${s.learned}・待複習 ${s.due + s.neu}</span></span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button class="badge" data-act="rename" data-id="${esc(d.id)}">改名</button>
+          <button class="badge" data-act="del" data-id="${esc(d.id)}">刪除</button>
+        </span>
+      </div>`;
+    }).join("") : `<div class="muted center" style="padding:20px 0">還沒有牌組</div>`;
+    $$("#list button").forEach(b => b.onclick = () => {
+      const d = findDeck(b.dataset.id);
+      if (!d) return;
+      if (b.dataset.act === "rename"){
+        const name = prompt("牌組名稱：", d.name);
+        if (name === null) return;
+        const icon = prompt("圖示 emoji：", d.icon) || d.icon;
+        renameDeck(d.id, name.trim() || d.name, icon.trim());
+      } else {
+        const s = deckStats(d.id);
+        if (!confirm(`刪除「${d.name}」？裡面的 ${s.total} 個單字也會一起刪掉。`)) return;
+        deleteDeck(d.id);
+        if (curDeck() === d.id) setCurDeck("all");
+      }
+      render();
+    });
+  }
+  $("#btnAdd").onclick = () => {
+    const name = prompt("新牌組名稱？", "多益單字");
+    if (!name) return;
+    const icon = prompt("用一個 emoji 當圖示：", "📗") || "📗";
+    addDeck(name.trim(), icon.trim());
+    render();
+  };
+  render();
+})();
+</script>
+</body>
+</html>

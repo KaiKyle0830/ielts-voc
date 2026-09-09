@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>選擇題</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>📝 選擇題</h1><div class="sub" id="subtitle"></div></div>
+  </div>
+
+  <div id="stage">
+    <div class="card">
+      <div class="q-num" id="counter"></div>
+      <div class="q-text" id="qText"></div>
+      <div id="opts"></div>
+      <div id="feedback" class="explain hidden"></div>
+      <button class="btn primary hidden" id="btnNext">下一題</button>
+    </div>
+  </div>
+
+  <div id="done" class="hidden">
+    <div class="card center">
+      <div style="font-size:3rem">📝</div>
+      <div class="score-big" id="doneStat"></div>
+      <div class="score-sub" id="doneSub"></div>
+      <button class="btn primary" onclick="location.reload()">再考一次</button>
+      <div style="height:10px"></div>
+      <a class="btn ghost" id="toSpell">換拼字題</a>
+      <div style="height:10px"></div>
+      <a class="btn ghost" href="index.html">回首頁</a>
+    </div>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const deck = curDeck();
+  const suffix = deckParam(deck);
+  $("#subtitle").textContent = deckLabel(deck);
+  $("#toSpell").href = "spell.html" + suffix;
+
+  const pool = deckWords(deck);
+  const wide = allWords();
+  if (pool.length < 2){
+    $("#stage").classList.add("hidden");
+    $("#done").classList.remove("hidden");
+    $("#doneStat").textContent = "單字不夠";
+    $("#doneSub").textContent = "至少要 2 個單字才能出選擇題";
+    return;
+  }
+
+  // 優先考今天到期的字，湊不滿再從全部裡抽
+  const N = Math.min(10, pool.length);
+  let picked = dueWords(deck).slice(0, N);
+  if (picked.length < N){
+    const have = new Set(picked.map(w => w.id));
+    picked = picked.concat(sampleN(pool.filter(w => !have.has(w.id)), N - picked.length));
+  }
+  const quiz = shuffle(picked).map(makeQ);
+  let cur = 0, right = 0, answered = false;
+
+  function distractors(w, field){
+    const same = pool.filter(x => x.id !== w.id && (x[field] || "").trim());
+    const more = wide.filter(x => x.id !== w.id && (x[field] || "").trim());
+    const src = same.length >= 3 ? same : more;
+    return sampleN(src, 3).map(x => x[field]);
+  }
+  function makeQ(w){
+    // 有可用例句的字，1/3 機率出填空題
+    const canCloze = w.ex && hasBlank(w.ex, w.en);
+    const r = Math.random();
+    let type = r < 0.42 ? "zh2en" : (r < 0.84 ? "en2zh" : "cloze");
+    if (type === "cloze" && !canCloze) type = "zh2en";
+    if (type === "en2zh" && !w.zh) type = "zh2en";
+    if (type === "zh2en" && !w.zh) type = canCloze ? "cloze" : "en2zh";
+
+    if (type === "en2zh"){
+      const opts = shuffle([w.zh].concat(distractors(w, "zh")));
+      return {w, type, q:`<b>${esc(w.en)}</b> 是什麼意思？`, opts, ans:w.zh};
+    }
+    if (type === "cloze"){
+      const opts = shuffle([w.en].concat(distractors(w, "en")));
+      return {w, type, q:esc(blankOut(w.ex, w.en)), opts, ans:w.en, sub:w.exZh};
+    }
+    const opts = shuffle([w.en].concat(distractors(w, "en")));
+    return {w, type, q:`「${esc(w.zh)}」的英文是？`, opts, ans:w.en};
+  }
+
+  function render(){
+    const q = quiz[cur];
+    answered = false;
+    $("#counter").textContent = `第 ${cur+1} / ${quiz.length} 題`;
+    $("#qText").innerHTML = q.q.replace(/＿＿＿/g, '<span class="blank">＿＿＿</span>');
+    $("#opts").innerHTML = q.opts.map((o,i) =>
+      `<button class="opt" data-i="${i}">${esc(o)}</button>`).join("");
+    $$("#opts .opt").forEach(b => b.onclick = () => choose(b, q));
+    $("#feedback").classList.add("hidden");
+    $("#btnNext").classList.add("hidden");
+    if (q.type === "en2zh") speak(q.w.en);
+  }
+  function choose(btn, q){
+    if (answered) return;
+    answered = true;
+    const ok = btn.textContent === q.ans;
+    $$("#opts .opt").forEach(b => {
+      b.disabled = true;
+      if (b.textContent === q.ans) b.classList.add("correct");
+      else if (b === btn) b.classList.add("wrong");
+    });
+    grade(q.w.en, ok ? 2 : 0);
+    if (ok) right++;
+    const w = q.w;
+    const fb = $("#feedback");
+    fb.className = "explain " + (ok ? "good" : "bad");
+    fb.innerHTML = (ok ? "✅ 答對了" : `❌ 正確答案：<b>${esc(q.ans)}</b>`) +
+      `<br><b>${esc(w.en)}</b> ${esc(w.pos)} ${esc(w.zh)}` +
+      (w.ex ? `<br>${esc(w.ex)}` : "") +
+      (w.exZh ? `<br><span class="muted">${esc(w.exZh)}</span>` : "") +
+      (w.note ? `<br><span class="muted">💡 ${esc(w.note)}</span>` : "");
+    speak(w.en);
+    $("#btnNext").textContent = cur === quiz.length - 1 ? "看結果" : "下一題";
+    $("#btnNext").classList.remove("hidden");
+  }
+  $("#btnNext").onclick = () => {
+    cur++;
+    if (cur >= quiz.length){
+      addQuizResult("mcq", right, quiz.length, deck);
+      $("#stage").classList.add("hidden");
+      $("#done").classList.remove("hidden");
+      $("#doneStat").textContent = `${right} / ${quiz.length}`;
+      $("#doneSub").textContent = right === quiz.length ? "全對！" : "答錯的字已經排進複習了";
+      return;
+    }
+    render();
+  };
+  render();
+})();
+</script>
+</body>
+</html>

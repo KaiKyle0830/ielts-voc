@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>IELTS 單字本</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1>📘 IELTS 單字本</h1>
+      <div class="sub" id="hello">今天也背幾個字吧</div>
+    </div>
+    <span class="spacer"></span>
+    <a class="act" href="settings.html">⚙️</a>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v" id="kTotal">0</div><div class="l">收錄單字</div></div>
+    <div class="kpi"><div class="v" id="kDue" style="color:var(--bad)">0</div><div class="l">今天要複習</div></div>
+    <div class="kpi"><div class="v" id="kLearned" style="color:var(--good)">0</div><div class="l">已熟記</div></div>
+  </div>
+
+  <div class="card" id="deckCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b>牌組</b><a class="small" style="color:var(--accent)" href="decks.html">管理 ›</a>
+    </div>
+    <div class="chips" id="deckChips"></div>
+  </div>
+
+  <a class="bigbtn hero" id="btnStudy" href="cards.html">
+    <span class="emoji">🗂</span>
+    <span><span class="t">背字卡</span><br><span class="d" id="studyDesc">滑開遮版看英文</span></span>
+    <span class="go">›</span>
+  </a>
+  <a class="bigbtn" id="btnMcq" href="mcq.html">
+    <span class="emoji">📝</span>
+    <span><span class="t">選擇題</span><br><span class="d">中→英、英→中、例句填空</span></span>
+    <span class="go">›</span>
+  </a>
+  <a class="bigbtn" id="btnSpell" href="spell.html">
+    <span class="emoji">✏️</span>
+    <span><span class="t">拼字題</span><br><span class="d">看中文和例句，把英文拼出來</span></span>
+    <span class="go">›</span>
+  </a>
+  <a class="bigbtn" id="btnList" href="list.html">
+    <span class="emoji">📋</span>
+    <span><span class="t">單字表</span><br><span class="d" id="listDesc">看全部單字、例句與熟練度</span></span>
+    <span class="go">›</span>
+  </a>
+  <a class="bigbtn" href="add.html">
+    <span class="emoji">➕</span>
+    <span><span class="t">新增單字</span><br><span class="d">貼上單字，交給 Claude 產生卡片</span></span>
+    <span class="go">›</span>
+  </a>
+
+  <div class="card" id="emptyHint" style="display:none">
+    <b>還沒有單字</b>
+    <p class="muted small" style="margin-top:8px;line-height:1.7">
+      到「新增單字」貼上你想背的字，產生指令丟給 Claude，
+      再把回來的內容貼回去就有字卡了。
+    </p>
+  </div>
+
+  <div class="card" id="recent" style="display:none">
+    <b>最近測驗</b>
+    <div id="recentList" style="margin-top:6px"></div>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const deck = curDeck();
+
+  // 牌組切換
+  const chips = $("#deckChips");
+  const decks = [{id:"all", name:"全部", icon:"📚"}].concat(allDecks());
+  chips.innerHTML = decks.map(d =>
+    `<button class="chip${d.id === deck ? " on" : ""}" data-id="${esc(d.id)}">${esc(d.icon)} ${esc(d.name)}</button>`
+  ).join("");
+  $$(".chip", chips).forEach(b => b.onclick = () => { setCurDeck(b.dataset.id); location.reload(); });
+
+  const st = deckStats(deck);
+  $("#kTotal").textContent = st.total;
+  $("#kDue").textContent = st.due + st.neu;
+  $("#kLearned").textContent = st.learned;
+
+  const n = streak();
+  $("#hello").textContent = st.total === 0
+    ? "先加幾個單字吧"
+    : (n > 1 ? `連續學習 ${n} 天，繼續保持 🔥` : "今天也背幾個字吧");
+
+  const suffix = deckParam(deck);
+  ["#btnStudy","#btnMcq","#btnSpell","#btnList"].forEach(s => $(s).href = $(s).href.split("?")[0] + suffix);
+
+  const todo = st.due + st.neu;
+  $("#studyDesc").textContent = todo
+    ? `今天有 ${todo} 張要複習（新字 ${st.neu}）`
+    : (st.total ? "今天的複習都完成了，可以自由練習" : "滑開遮版看英文");
+  $("#listDesc").textContent = st.total ? `${st.total} 個單字・${deckLabel(deck)}` : "看全部單字、例句與熟練度";
+
+  if (!st.total){
+    $("#emptyHint").style.display = "";
+    ["#btnStudy","#btnMcq","#btnSpell","#btnList"].forEach(s => $(s).setAttribute("disabled",""));
+  }
+
+  const q = quizHistory().slice(-5).reverse();
+  if (q.length){
+    $("#recent").style.display = "";
+    const label = {mcq:"選擇題", spell:"拼字題", cards:"字卡"};
+    $("#recentList").innerHTML = q.map(r =>
+      `<div class="row"><span class="small">${esc(String(r.d).replace("T"," "))}</span>
+       <span class="badge">${esc(label[r.mode] || r.mode)}</span>
+       <b style="margin-left:auto">${r.s} / ${r.t}</b></div>`).join("");
+  }
+})();
+</script>
+</body>
+</html>

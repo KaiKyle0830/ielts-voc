@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>新增單字</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>➕ 新增單字</h1><div class="sub">貼上單字 → 交給 Claude → 匯入</div></div>
+  </div>
+
+  <div class="card">
+    <label class="f" style="margin-top:0">要放進哪一組？</label>
+    <select class="inp" id="deckSel"></select>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn ghost sm" id="btnNewDeck" style="width:auto">＋ 新牌組</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="f" style="margin-top:0">1. 貼上你要背的單字</label>
+    <div class="muted small" style="margin-bottom:8px;line-height:1.6">
+      一行一個字。想指定意思就寫成「<code>abandon 放棄</code>」，我會照你給的意思造句。
+    </div>
+    <textarea class="inp" id="raw" placeholder="resilient&#10;advocate&#10;mitigate 減輕"></textarea>
+    <div class="muted small" id="cnt" style="margin-top:8px">辨識到 0 個單字</div>
+  </div>
+
+  <div class="card">
+    <label class="f" style="margin-top:0">2. 交給 Claude 產生內容</label>
+    <button class="btn primary" id="btnCopy">📋 複製指令，貼到 Claude</button>
+    <div class="muted small" style="margin-top:10px;line-height:1.7">
+      複製後貼到 Claude Code（或 Claude App）的對話框送出，
+      它會回一段 JSON，整段複製起來貼到下面第 3 步。
+    </div>
+    <div id="apiBox" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
+      <button class="btn ghost" id="btnGen">⚡ 直接自動生成（用你設定的 API key）</button>
+      <div class="muted small" id="genStat" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="f" style="margin-top:0">3. 把 Claude 回覆的內容貼回來</label>
+    <textarea class="inp" id="json" placeholder='[{"en":"resilient","pos":"adj.","zh":"…","ex":"…","exZh":"…","note":"…"}]'></textarea>
+    <div style="height:12px"></div>
+    <button class="btn primary" id="btnImport">匯入單字</button>
+    <div id="preview" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary style="font-weight:700;cursor:pointer">✍️ 自己手動加一個字</summary>
+      <label class="f">英文</label><input class="inp" id="mEn" autocapitalize="off" autocorrect="off">
+      <label class="f">詞性</label><input class="inp" id="mPos" placeholder="n. / v. / adj.">
+      <label class="f">中文</label><input class="inp" id="mZh">
+      <label class="f">例句</label><input class="inp" id="mEx">
+      <label class="f">例句翻譯</label><input class="inp" id="mExZh">
+      <label class="f">筆記</label><input class="inp" id="mNote">
+      <div style="height:14px"></div>
+      <button class="btn ghost" id="btnManual">加入</button>
+    </details>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script src="js/ai.js"></script>
+<script>
+(function(){
+  syncSeed();
+
+  // ---- 牌組選單 ----
+  function fillDecks(sel){
+    const decks = allDecks();
+    $("#deckSel").innerHTML = decks.map(d =>
+      `<option value="${esc(d.id)}">${esc(d.icon)} ${esc(d.name)}</option>`).join("");
+    const want = sel || curDeck();
+    $("#deckSel").value = decks.some(d => d.id === want) ? want : (decks[0] && decks[0].id);
+  }
+  fillDecks();
+  $("#btnNewDeck").onclick = () => {
+    const name = prompt("新牌組名稱？", "多益單字");
+    if (!name) return;
+    const icon = prompt("用一個 emoji 當圖示：", "📗") || "📗";
+    fillDecks(addDeck(name.trim(), icon.trim()));
+    toast("已建立牌組");
+  };
+
+  // ---- 步驟 1：辨識單字 ----
+  let items = [];
+  function refresh(){
+    items = parseInputWords($("#raw").value);
+    $("#cnt").textContent = `辨識到 ${items.length} 個單字` +
+      (items.length ? "：" + items.slice(0,6).map(w => w.en).join("、") + (items.length > 6 ? " …" : "") : "");
+    $("#btnCopy").disabled = !items.length;
+    $("#btnGen").disabled = !items.length;
+  }
+  $("#raw").addEventListener("input", refresh);
+  refresh();
+
+  // ---- 步驟 2：複製指令 / 自動生成 ----
+  $("#btnCopy").onclick = async () => {
+    const ok = await copyText(buildPrompt(items));
+    toast(ok ? `已複製 ${items.length} 個字的指令，去貼給 Claude` : "複製失敗，請手動選取");
+  };
+
+  if (getApiKey()) $("#apiBox").classList.remove("hidden");
+  $("#btnGen").onclick = async () => {
+    $("#btnGen").disabled = true;
+    $("#genStat").textContent = `產生中…（${items.length} 個字，可能要十幾秒）`;
+    try {
+      const list = await generateWithAPI(items);
+      $("#json").value = JSON.stringify(list, null, 2);
+      $("#genStat").textContent = `完成，產生了 ${list.length} 筆，往下按「匯入單字」`;
+      showPreview(list);
+    } catch(e){
+      $("#genStat").textContent = "失敗：" + e.message;
+    }
+    $("#btnGen").disabled = false;
+  };
+
+  // ---- 步驟 3：匯入 ----
+  function showPreview(list){
+    $("#preview").innerHTML = `<div class="muted small" style="margin-bottom:6px">預覽 ${list.length} 筆</div>` +
+      list.slice(0, 30).map(w => `
+        <div class="wl-item">
+          <div class="wl-head"><span class="wl-en">${esc(w.en)}</span>
+            <span class="wl-pos">${esc(w.pos)}</span>
+            <span class="wl-zh">${esc(w.zh)}</span></div>
+          <div class="wl-ex">${esc(w.ex)}<br>${esc(w.exZh)}</div>
+        </div>`).join("");
+  }
+  $("#btnImport").onclick = () => {
+    let list;
+    try { list = parseWordsJSON($("#json").value); }
+    catch(e){ toast("看不懂這段內容，請確認整段 JSON 都貼進來了"); return; }
+    if (!list.length){ toast("沒有讀到任何單字"); return; }
+    const r = importWords(list, $("#deckSel").value);
+    showPreview(list);
+    toast(`匯入完成：新增 ${r.added} 筆${r.updated ? `、更新 ${r.updated} 筆` : ""}`, 2600);
+    setCurDeck($("#deckSel").value);
+    setTimeout(() => location.href = "list.html" + deckParam($("#deckSel").value), 1200);
+  };
+
+  // ---- 手動新增 ----
+  $("#btnManual").onclick = () => {
+    const en = $("#mEn").value.trim();
+    if (!en){ toast("英文不能空白"); return; }
+    importWords([{en, pos:$("#mPos").value, zh:$("#mZh").value, ex:$("#mEx").value,
+                  exZh:$("#mExZh").value, note:$("#mNote").value}], $("#deckSel").value);
+    ["#mEn","#mPos","#mZh","#mEx","#mExZh","#mNote"].forEach(s => $(s).value = "");
+    toast("已加入：" + en);
+  };
+})();
+</script>
+</body>
+</html>

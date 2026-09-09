@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>拼字題</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>✏️ 拼字題</h1><div class="sub" id="subtitle"></div></div>
+  </div>
+
+  <div id="stage">
+    <div class="card center">
+      <div class="q-num" id="counter"></div>
+      <div class="fc-word" id="zhWord" style="font-size:1.7rem"></div>
+      <div class="muted" id="zhPos" style="margin:4px 0 10px"></div>
+      <div class="muted small" id="clue" style="line-height:1.6;margin-bottom:12px"></div>
+      <div class="spell-hint" id="hint"></div>
+      <input class="spell-input" id="input" type="text" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" placeholder="拼出英文">
+      <div class="btnrow" style="margin-top:12px">
+        <button class="btn ghost sm" id="btnHint" style="width:auto">💡 提示</button>
+        <button class="btn ghost sm" id="btnSpeak" style="width:auto">🔊 唸一次</button>
+      </div>
+      <div id="feedback" class="explain hidden"></div>
+      <div style="height:12px"></div>
+      <button class="btn primary" id="btnCheck">檢查</button>
+    </div>
+  </div>
+
+  <div id="done" class="hidden">
+    <div class="card center">
+      <div style="font-size:3rem">✏️</div>
+      <div class="score-big" id="doneStat"></div>
+      <div class="score-sub" id="doneSub"></div>
+      <button class="btn primary" onclick="location.reload()">再考一次</button>
+      <div style="height:10px"></div>
+      <a class="btn ghost" id="toMcq">換選擇題</a>
+      <div style="height:10px"></div>
+      <a class="btn ghost" href="index.html">回首頁</a>
+    </div>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const deck = curDeck();
+  $("#subtitle").textContent = deckLabel(deck);
+  $("#toMcq").href = "mcq.html" + deckParam(deck);
+
+  const pool = deckWords(deck);
+  if (!pool.length){
+    $("#stage").classList.add("hidden");
+    $("#done").classList.remove("hidden");
+    $("#doneStat").textContent = "還沒有單字";
+    $("#doneSub").textContent = "先去「新增單字」加幾個字";
+    return;
+  }
+  const N = Math.min(10, pool.length);
+  let picked = dueWords(deck).slice(0, N);
+  if (picked.length < N){
+    const have = new Set(picked.map(w => w.id));
+    picked = picked.concat(sampleN(pool.filter(w => !have.has(w.id)), N - picked.length));
+  }
+  const quiz = shuffle(picked);
+  let cur = 0, right = 0, checked = false, hintLevel = 0;
+
+  const norm = s => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+  function render(){
+    const w = quiz[cur];
+    checked = false; hintLevel = 0;
+    $("#counter").textContent = `第 ${cur+1} / ${quiz.length} 題`;
+    $("#zhWord").textContent = w.zh || "（沒有中文）";
+    $("#zhPos").textContent = w.pos || "";
+    $("#clue").innerHTML = w.ex && hasBlank(w.ex, w.en)
+      ? esc(blankOut(w.ex, w.en)) + (w.exZh ? `<br>${esc(w.exZh)}` : "")
+      : (w.exZh ? esc(w.exZh) : "");
+    $("#hint").textContent = "";
+    $("#input").value = "";
+    $("#input").disabled = false;
+    $("#feedback").classList.add("hidden");
+    $("#btnCheck").textContent = "檢查";
+    $("#input").focus();
+  }
+  $("#btnHint").onclick = () => {
+    const en = quiz[cur].en;
+    hintLevel = Math.min(hintLevel + 1, en.length);
+    $("#hint").textContent = en.slice(0, hintLevel) +
+      en.slice(hintLevel).replace(/[A-Za-z]/g, "_");
+  };
+  $("#btnSpeak").onclick = () => speak(quiz[cur].en);
+
+  function check(){
+    if (checked){ next(); return; }
+    const w = quiz[cur];
+    const ok = norm($("#input").value) === norm(w.en);
+    // 用了提示就算「有點模糊」，不給滿分
+    grade(w.en, ok ? (hintLevel ? 1 : 2) : 0);
+    if (ok) right++;
+    const fb = $("#feedback");
+    fb.className = "explain " + (ok ? "good" : "bad");
+    fb.innerHTML = (ok ? `✅ 正確！<b>${esc(w.en)}</b>` : `❌ 正確答案是 <b>${esc(w.en)}</b>`) +
+      (w.ex ? `<br>${esc(w.ex)}` : "") +
+      (w.exZh ? `<br><span class="muted">${esc(w.exZh)}</span>` : "") +
+      (w.note ? `<br><span class="muted">💡 ${esc(w.note)}</span>` : "");
+    speak(w.en);
+    checked = true;
+    $("#input").disabled = true;
+    $("#btnCheck").textContent = cur === quiz.length - 1 ? "看結果" : "下一題";
+  }
+  function next(){
+    cur++;
+    if (cur >= quiz.length){
+      addQuizResult("spell", right, quiz.length, deck);
+      $("#stage").classList.add("hidden");
+      $("#done").classList.remove("hidden");
+      $("#doneStat").textContent = `${right} / ${quiz.length}`;
+      $("#doneSub").textContent = right === quiz.length ? "全對！拼字大師" : "拼錯的字已經排進複習了";
+      return;
+    }
+    render();
+  }
+  $("#btnCheck").onclick = check;
+  $("#input").addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+  render();
+})();
+</script>
+</body>
+</html>

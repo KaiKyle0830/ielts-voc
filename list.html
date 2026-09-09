@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>單字表</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>📋 單字表</h1><div class="sub" id="subtitle"></div></div>
+    <span class="spacer"></span>
+    <a class="act" href="add.html">＋</a>
+  </div>
+
+  <input class="inp" id="search" placeholder="🔍 搜尋單字或中文" style="margin-bottom:12px">
+  <div class="chips" id="filters" style="margin-bottom:12px">
+    <button class="chip on" data-f="all">全部</button>
+    <button class="chip" data-f="due">今天要複習</button>
+    <button class="chip" data-f="new">還沒看過</button>
+    <button class="chip" data-f="weak">不熟</button>
+  </div>
+
+  <div class="card" id="listCard"><div id="list"></div></div>
+</main>
+
+<div id="editor" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;overflow:auto">
+  <div style="max-width:600px;margin:40px auto;padding:16px">
+    <div class="card">
+      <b id="edTitle">編輯單字</b>
+      <label class="f">英文</label><input class="inp" id="eEn" autocapitalize="off" autocorrect="off">
+      <label class="f">詞性</label><input class="inp" id="ePos">
+      <label class="f">中文</label><input class="inp" id="eZh">
+      <label class="f">例句</label><textarea class="inp" id="eEx" style="min-height:70px"></textarea>
+      <label class="f">例句翻譯</label><textarea class="inp" id="eExZh" style="min-height:70px"></textarea>
+      <label class="f">筆記</label><input class="inp" id="eNote">
+      <div style="height:16px"></div>
+      <div class="btnrow">
+        <button class="btn ghost" id="eCancel">取消</button>
+        <button class="btn primary" id="eSave">儲存</button>
+      </div>
+      <div style="height:10px"></div>
+      <button class="btn danger" id="eDelete">刪除這個字</button>
+    </div>
+  </div>
+</div>
+
+<script src="data/seed.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const deck = curDeck();
+  let filter = "all", kw = "";
+  let editing = null;
+
+  const BOX_NAME = ["新字","今天再看","２天後","４天後","８天後","熟了"];
+
+  function match(w){
+    if (kw){
+      const s = (w.en + " " + w.zh + " " + w.ex + " " + w.exZh).toLowerCase();
+      if (!s.includes(kw)) return false;
+    }
+    if (filter === "due")  return isDue(w) || isNew(w);
+    if (filter === "new")  return isNew(w);
+    if (filter === "weak") return !isNew(w) && getProg(w.en).box <= 1;
+    return true;
+  }
+
+  function render(){
+    const ws = deckWords(deck).filter(match);
+    $("#subtitle").textContent = `${deckLabel(deck)}・${ws.length} 個字`;
+    if (!ws.length){
+      $("#list").innerHTML = `<div class="muted center" style="padding:24px 0">沒有符合的單字</div>`;
+      return;
+    }
+    $("#list").innerHTML = ws.map(w => {
+      const p = getProg(w.en);
+      const isN = isNew(w);
+      const cls = isN ? "new" : (p.box >= 3 ? "done" : (isDue(w) ? "due" : ""));
+      const label = isN ? "新字" : (isDue(w) ? "待複習" : BOX_NAME[p.box]);
+      return `<div class="wl-item" data-id="${esc(w.id)}">
+        <div class="wl-head">
+          <span class="wl-en">${esc(w.en)}</span>
+          <span class="wl-pos">${esc(w.pos)}</span>
+          <span class="badge ${cls}" style="margin-left:auto">${esc(label)}</span>
+        </div>
+        <div style="margin-top:3px">${esc(w.zh)}</div>
+        ${w.ex ? `<div class="wl-ex">${esc(w.ex)}${w.exZh ? "<br>" + esc(w.exZh) : ""}</div>` : ""}
+        ${w.note ? `<div class="wl-ex">💡 ${esc(w.note)}</div>` : ""}
+      </div>`;
+    }).join("");
+    $$("#list .wl-item").forEach(el => {
+      let t = 0;
+      el.onclick = e => {
+        const w = allWords().find(x => x.id === el.dataset.id);
+        if (!w) return;
+        const now = Date.now();
+        if (now - t < 400){ openEditor(w); t = 0; return; }   // 連點兩下＝編輯
+        t = now;
+        speak(w.en);
+      };
+    });
+  }
+
+  function openEditor(w){
+    editing = w.id;
+    $("#edTitle").textContent = "編輯：" + w.en;
+    $("#eEn").value = w.en; $("#ePos").value = w.pos; $("#eZh").value = w.zh;
+    $("#eEx").value = w.ex; $("#eExZh").value = w.exZh; $("#eNote").value = w.note;
+    $("#editor").classList.remove("hidden");
+  }
+  $("#eCancel").onclick = () => $("#editor").classList.add("hidden");
+  $("#eSave").onclick = () => {
+    updateWord(editing, {en:$("#eEn").value.trim(), pos:$("#ePos").value.trim(),
+      zh:$("#eZh").value.trim(), ex:$("#eEx").value.trim(),
+      exZh:$("#eExZh").value.trim(), note:$("#eNote").value.trim()});
+    $("#editor").classList.add("hidden");
+    toast("已儲存"); render();
+  };
+  $("#eDelete").onclick = () => {
+    if (!confirm("確定要刪掉這個字嗎？")) return;
+    deleteWord(editing);
+    $("#editor").classList.add("hidden");
+    toast("已刪除"); render();
+  };
+
+  $("#search").addEventListener("input", e => { kw = e.target.value.trim().toLowerCase(); render(); });
+  $$("#filters .chip").forEach(b => b.onclick = () => {
+    $$("#filters .chip").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    filter = b.dataset.f;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
