@@ -28,6 +28,11 @@ function loadDB(){
   return db;
 }
 function saveDB(db){ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
+function setSetting(k, v){
+  const db = loadDB();
+  db.settings[k] = v;
+  saveDB(db);
+}
 
 /* 第一次開啟（或 seed 檔更新）時，把 data/seed.js 的單字併進來 */
 function syncSeed(){
@@ -284,7 +289,31 @@ async function copyText(text){
   }
 }
 
-/* ---------- 發音（瀏覽器內建語音）---------- */
+/* ---------- 發音 ----------
+   優先播 audio/ 底下事先合成好的 mp3（gen/generate_audio.py 產生，微軟神經語音），
+   每支手機聽起來都一樣；沒有現成音檔的字才退回瀏覽器內建語音。 */
+
+// 和 gen/seedlib.py 的 key_of() 是同一套雜湊（FNV-1a 32-bit）
+function audioKey(text){
+  const bytes = new TextEncoder().encode(String(text || "").replace(/\s+/g, " ").trim());
+  let h = 2166136261;
+  for (let i = 0; i < bytes.length; i++) h = Math.imul(h ^ bytes[i], 16777619) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}
+// data/audio.js 把所有 key 接成一長串，每 8 個字元一個
+let _audioKeys = null;
+function hasAudio(key){
+  if (!_audioKeys){
+    const s = window.AUDIO_KEYS || "";
+    _audioKeys = new Set();
+    for (let i = 0; i + 8 <= s.length; i += 8) _audioKeys.add(s.substr(i, 8));
+  }
+  return _audioKeys.has(key);
+}
+// 沒網路或想省流量時可以切回內建語音
+function useBuiltinVoice(){ return !!loadDB().settings.builtinVoice; }
+function setBuiltinVoice(on){ setSetting("builtinVoice", !!on); }
+
 let _voice = null;
 function pickVoice(){
   if (!("speechSynthesis" in window)) return;
@@ -304,14 +333,33 @@ if ("speechSynthesis" in window){
   pickVoice();
   speechSynthesis.onvoiceschanged = pickVoice;
 }
-function speak(text, rate){
+function ttsSpeak(text){
   if (!("speechSynthesis" in window) || !text) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(String(text));
   u.lang = "en-US";
-  u.rate = rate || 0.9;
+  u.rate = 1;
   if (_voice) u.voice = _voice;
   speechSynthesis.speak(u);
+}
+
+let _player = null;
+function stopSpeaking(){
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  if (_player){ _player.pause(); _player = null; }
+}
+function speak(text){
+  if (!text) return;
+  stopSpeaking();
+  const key = audioKey(text);
+  if (useBuiltinVoice() || !hasAudio(key)){ ttsSpeak(text); return; }
+  const a = new Audio("audio/" + key + ".mp3");
+  _player = a;
+  // 音檔壞掉或被擋下來就改用內建語音，不能讓它沒聲音
+  const fallback = () => { if (_player === a){ _player = null; ttsSpeak(text); } };
+  a.onerror = fallback;
+  const p = a.play();
+  if (p && p.catch) p.catch(fallback);
 }
 
 /* ---------- 備份 ---------- */

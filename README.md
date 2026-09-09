@@ -32,6 +32,9 @@ Claude 會產生中文、詞性、例句、例句翻譯，寫進 `data/seed.js`
 | 檔案 | 作用 |
 |---|---|
 | `data/seed.js` | Claude 寫進來的單字。**加字就是改這個檔** |
+| `data/audio.js` | 發音檔索引，由 `gen/generate_audio.py` 自動產生 |
+| `audio/*.mp3` | 事先合成的發音（微軟神經語音） |
+| `gen/generate_audio.py` | 產生發音檔；`gen/check.py` 檢查 seed.js |
 | `js/app.js` | 資料層、間隔複習、發音、共用工具 |
 | `js/ai.js` | 產生給 Claude 的指令、解析 JSON、（選配）直接呼叫 API |
 | `index.html` | 首頁 |
@@ -53,6 +56,25 @@ window.SEED_WORDS = [
 ```
 
 匯入時以英文字為準：已經存在的字不會覆蓋，所以你在 App 裡改過的內容不會被蓋掉。
+
+## 發音
+
+單字和例句都事先用微軟神經語音（`en-US-EmmaNeural`，正常語速）合成成 mp3 放在 `audio/`，
+和 kim-english 同一套做法，每台裝置聽起來都一樣。檔名是句子的 FNV-1a 雜湊，
+`data/audio.js` 存所有檔名，網頁播之前先查有沒有現成音檔，沒有才退回裝置內建語音。
+
+**加完新單字一定要補產生發音**：
+
+```bash
+pip3 install --user edge-tts        # 只需裝一次
+python3 gen/check.py                # 先確認 seed.js 沒問題
+python3 gen/generate_audio.py       # 只會補產生缺少的
+```
+
+換聲音就改 `gen/generate_audio.py` 裡的 `VOICE` 再跑 `--force` 全部重做。
+想練英式聽力可以換成 `en-GB-SoniaNeural` 或 `en-GB-RyanNeural`。
+
+iPhone 開靜音模式時聽不到 mp3（iOS 的限制），設定頁可以勾「一律改用裝置內建語音」。
 
 ## 資料保存
 

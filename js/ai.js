@@ -80,11 +80,6 @@ function parseWordsJSON(text){
 /* ---------- 直接呼叫 Claude API（設定頁填了 API key 才會用到）---------- */
 function getApiKey(){ return (loadDB().settings.apiKey || "").trim(); }
 function getModel(){ return loadDB().settings.model || AI_MODELS[0].id; }
-function setSetting(k, v){
-  const db = loadDB();
-  db.settings[k] = v;
-  saveDB(db);
-}
 
 async function generateWithAPI(items){
   const apiKey = getApiKey();

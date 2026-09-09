@@ -40,11 +40,20 @@
   </div>
 
   <div class="card">
-    <b>🔊 發音</b>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <b>🔊 發音</b><span class="muted small" id="audioStat">–</span>
+    </div>
     <p class="muted small" style="margin:8px 0 12px;line-height:1.7">
-      用手機／電腦內建的英文語音。iPhone 開靜音時可能沒聲音。
+      單字和例句都用微軟神經語音事先錄好，每台裝置聽起來都一樣。
+      你自己新增的字沒有錄音檔，會自動改用裝置內建語音。
     </p>
     <button class="btn ghost" id="btnTest">試聽一句</button>
+    <label class="muted small" style="display:flex;gap:8px;align-items:center;margin-top:14px">
+      <input type="checkbox" id="builtinVoice"> 一律改用裝置內建語音
+    </label>
+    <div class="muted small" style="margin-top:6px;line-height:1.6">
+      iPhone 開靜音模式時聽不到錄音檔，可以關掉靜音，或勾選上面這一項。
+    </div>
   </div>
 
   <div class="card">
@@ -77,6 +86,7 @@
   </div>
 </main>
 <script src="data/seed.js"></script>
+<script src="data/audio.js"></script>
 <script src="js/app.js"></script>
 <script src="js/ai.js"></script>
 <script>
@@ -136,7 +146,27 @@
     r.readAsText(f);
   };
 
-  $("#btnTest").onclick = () => speak("This is how the pronunciation sounds.");
+  // ---- 發音 ----
+  const nKeys = ((window.AUDIO_KEYS || "").length / 8) | 0;
+  const chk = $("#builtinVoice");
+  function refreshAudioStat(){
+    $("#audioStat").textContent = chk.checked
+      ? "裝置內建語音"
+      : (nKeys ? `已錄好 ${nKeys} 句` : "裝置內建語音");
+  }
+  chk.checked = useBuiltinVoice();
+  refreshAudioStat();
+  chk.onchange = () => {
+    setBuiltinVoice(chk.checked);
+    refreshAudioStat();
+    demo();                            // 馬上唸一句，聽得出差別
+  };
+  // 挑一句真的有錄音檔的例句，才比得出兩種語音
+  function demo(){
+    const w = allWords().find(x => x.ex && hasAudio(audioKey(x.ex)));
+    speak(w ? w.ex : "Sustainable development requires considerable effort.");
+  }
+  $("#btnTest").onclick = demo;
 
   // ---- API key（選配）----
   $("#model").innerHTML = AI_MODELS.map(m =>
