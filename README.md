@@ -83,6 +83,34 @@ python3 gen/generate_audio.py       # 只會補產生缺少的
 
 iPhone 開靜音模式時聽不到 mp3（iOS 的限制），設定頁可以勾「一律改用裝置內建語音」。
 
+## 跨裝置同步
+
+進度存到你自己的 **GitHub secret gist**，電腦和手機共用同一份。免費，不用另外註冊服務。
+
+**第一台裝置**
+1. 到 <https://github.com/settings/tokens> → Generate new token (classic) → 只勾 **gist** → 複製
+2. App 設定頁 → 跨裝置同步 → 貼上 token → 「開始同步」（會自動建立一個 secret gist）
+
+**第二台裝置**
+設定頁按「複製設定碼」，把那串 `VOC1....` 傳到另一台（LINE、備忘錄都行），
+在那台的設定頁貼進「已經在另一台設定好了？」欄位 → 「用設定碼連上」。不用再產生 token。
+
+之後：**打開 App 自動拉最新進度，離開或做完一輪測驗自動上傳**。
+
+合併方式不是「後蓋前」，是逐筆比時間戳：
+
+| 資料 | 合併規則 |
+|---|---|
+| 熟練度 `prog` | 每個字各自比 `at`，晚練的那台贏 |
+| 單字 `words` | 同上；刪掉的字留墓碑 `gone`，不會從另一台復活 |
+| 測驗紀錄 `quiz` | 兩邊聯集，用時間＋分數去重 |
+| 設定（token、API key） | **不同步**，各裝置獨立 |
+
+所以手機和電腦各背各的，之後同步不會互相蓋掉。
+
+token 只存在各裝置的 localStorage，不會進 repo，也不會傳到 GitHub 以外的地方。
+只勾 `gist` 權限的 token 就算外流，最多也只能動你的 gist，碰不到 repo。
+
 ## 資料保存
 
 單字和進度都在瀏覽器的 localStorage（key: `myVocabApp`）。

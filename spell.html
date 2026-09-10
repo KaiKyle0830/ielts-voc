@@ -51,9 +51,11 @@
 <script src="data/seed.js"></script>
 <script src="data/audio.js"></script>
 <script src="js/app.js"></script>
+<script src="js/sync.js"></script>
 <script>
 (function(){
   syncSeed();
+  autoSyncOnLeave();
   const deck = curDeck();
   $("#subtitle").textContent = deckLabel(deck);
   $("#toMcq").href = "mcq.html" + deckParam(deck);

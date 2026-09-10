@@ -71,10 +71,12 @@
 <script src="data/seed.js"></script>
 <script src="data/audio.js"></script>
 <script src="js/app.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/ai.js"></script>
 <script>
 (function(){
   syncSeed();
+  autoSyncOnLeave();
 
   // ---- 牌組選單 ----
   function fillDecks(sel){

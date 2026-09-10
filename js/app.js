@@ -16,7 +16,7 @@ DB = {
 }
 ------------------------------------- */
 
-const DEFAULT_DB = { v:1, seedVersion:0, decks:[], words:[], prog:{}, quiz:[], settings:{} };
+const DEFAULT_DB = { v:1, seedVersion:0, decks:[], words:[], prog:{}, quiz:[], settings:{}, gone:{} };
 
 function loadDB(){
   let db;
@@ -25,6 +25,7 @@ function loadDB(){
   db.decks = db.decks || []; db.words = db.words || [];
   db.prog = db.prog || {};   db.quiz  = db.quiz  || [];
   db.settings = db.settings || {};
+  db.gone = db.gone || {};
   return db;
 }
 function saveDB(db){ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
@@ -42,9 +43,10 @@ function syncSeed(){
   if (!db.decks.length) db.decks = [{id:"my", name:"我的單字", icon:"📘"}];
   if (ver <= db.seedVersion) return db;
   const have = new Set(db.words.map(w => key(w.en)));
+  const gone = db.gone || {};
   let added = 0;
   seed.forEach(w => {
-    if (have.has(key(w.en))) return;
+    if (have.has(key(w.en)) || gone[key(w.en)]) return;
     db.words.push(normalizeWord(w));
     have.add(key(w.en));
     added++;
@@ -73,7 +75,8 @@ function normalizeWord(w){
     ex:    String(w.ex || "").trim(),
     exZh:  String(w.exZh || "").trim(),
     note:  String(w.note || "").trim(),
-    added: w.added || new Date().toISOString().slice(0,10)
+    added: w.added || today(),
+    at:    w.at || Date.now()
   };
 }
 
@@ -120,7 +123,8 @@ function importWords(list, deckId){
     const old = idx.get(key(w.en));
     if (old){
       Object.assign(old, {pos:w.pos||old.pos, zh:w.zh||old.zh, ex:w.ex||old.ex,
-                          exZh:w.exZh||old.exZh, note:w.note||old.note, deck:w.deck});
+                          exZh:w.exZh||old.exZh, note:w.note||old.note, deck:w.deck,
+                          at: Date.now()});
       updated++;
     } else {
       db.words.push(w); idx.set(key(w.en), w); added++;
@@ -133,14 +137,18 @@ function updateWord(id, patch){
   const db = loadDB();
   const w = db.words.find(x => x.id === id);
   if (!w) return;
-  Object.assign(w, patch);
+  Object.assign(w, patch, {at: Date.now()});
   saveDB(db);
 }
 function deleteWord(id){
   const db = loadDB();
   const w = db.words.find(x => x.id === id);
   db.words = db.words.filter(x => x.id !== id);
-  if (w) delete db.prog[key(w.en)];
+  if (w){
+    delete db.prog[key(w.en)];
+    db.gone = db.gone || {};
+    db.gone[key(w.en)] = Date.now();     // 墓碑：同步時不讓它從另一台裝置復活
+  }
   saveDB(db);
 }
 
@@ -185,6 +193,7 @@ function grade(en, g){
   else { p.box = 0; p.wrong++; }
   p.due  = addDays(BOX_DAYS[p.box]);
   p.last = today();
+  p.at   = Date.now();          // 跨裝置合併時用這個判斷誰比較新
   db.prog[k] = p;
   saveDB(db);
 }
@@ -232,6 +241,8 @@ function addQuizResult(mode, s, t, deck){
   db.quiz.push({d: ymd(now) + "T" + hm(now), ts: Date.now(), mode, s, t, deck: deck || "all"});
   if (db.quiz.length > 100) db.quiz = db.quiz.slice(-100);
   saveDB(db);
+  // 做完一輪就上傳，換裝置時不會少掉剛剛的成績
+  if (typeof syncPushQuiet === "function") syncPushQuiet();
 }
 function quizHistory(){ return loadDB().quiz; }
 
