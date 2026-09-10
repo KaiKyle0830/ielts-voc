@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>錯題複習</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="back" href="index.html">‹</a>
+    <div><h1>📕 錯題複習</h1><div class="sub" id="subtitle"></div></div>
+  </div>
+
+  <div id="hasWrong" class="hidden">
+    <a class="bigbtn hero" id="btnSpell" href="spell.html?mode=wrong">
+      <span class="emoji">✏️</span>
+      <span><span class="t">錯題拼字</span><br><span class="d">拼錯的字最該重寫一次</span></span>
+      <span class="go">›</span>
+    </a>
+    <a class="bigbtn" id="btnMcq" href="mcq.html?mode=wrong">
+      <span class="emoji">📝</span>
+      <span><span class="t">錯題選擇</span><br><span class="d">先確認意思有沒有記對</span></span>
+      <span class="go">›</span>
+    </a>
+    <a class="bigbtn" id="btnCards" href="cards.html?mode=wrong">
+      <span class="emoji">🗂</span>
+      <span><span class="t">錯題字卡</span><br><span class="d">連意思都忘了就先看字卡</span></span>
+      <span class="go">›</span>
+    </a>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <b>錯過的字</b><span class="muted small" id="cnt"></span>
+      </div>
+      <div class="muted small" style="margin-bottom:10px;line-height:1.6">
+        連續答對到「４天後」這一級就會自動從這裡消失。點一下可以發音。
+      </div>
+      <div id="list"></div>
+    </div>
+  </div>
+
+  <div id="noWrong" class="card center hidden">
+    <div style="font-size:3rem">🎯</div>
+    <div class="score-big" style="font-size:1.4rem">目前沒有錯題</div>
+    <div class="score-sub">做測驗答錯的字會自動收集到這裡</div>
+    <a class="btn primary" href="spell.html">去做拼字題</a>
+    <div style="height:10px"></div>
+    <a class="btn ghost" href="index.html">回首頁</a>
+  </div>
+</main>
+<script src="data/seed.js"></script>
+<script src="data/audio.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function(){
+  syncSeed();
+  const deck = curDeck();
+  const suffix = deckParam(deck);
+  const ws = wrongWords(deck);
+  $("#subtitle").textContent = deckLabel(deck) + (ws.length ? `・${ws.length} 個字` : "");
+
+  if (!ws.length){
+    $("#noWrong").classList.remove("hidden");
+    return;
+  }
+  $("#hasWrong").classList.remove("hidden");
+  $("#cnt").textContent = `${ws.length} 個`;
+  ["#btnSpell","#btnMcq","#btnCards"].forEach(s => {
+    if (suffix) $(s).href += "&deck=" + encodeURIComponent(deck);
+  });
+
+  const BOX_NAME = ["新字","今天再看","２天後","４天後","８天後","熟了"];
+  $("#list").innerHTML = ws.map(w => {
+    const p = getProg(w.en);
+    return `<div class="wl-item" data-en="${esc(w.en)}">
+      <div class="wl-head">
+        <span class="wl-en">${esc(w.en)}</span>
+        <span class="wl-pos">${esc(w.pos)}</span>
+        <span class="badge due" style="margin-left:auto">錯 ${p.wrong} 次</span>
+      </div>
+      <div style="margin-top:3px">${esc(w.zh)}</div>
+      ${w.ex ? `<div class="wl-ex">${esc(w.ex)}${w.exZh ? "<br>" + esc(w.exZh) : ""}</div>` : ""}
+      <div class="wl-ex">熟練度：${esc(BOX_NAME[p.box])}・答對 ${p.right} 次</div>
+    </div>`;
+  }).join("");
+  $$("#list .wl-item").forEach(el => el.onclick = () => speak(el.dataset.en));
+})();
+</script>
+</body>
+</html>

@@ -48,7 +48,7 @@
       <div style="font-size:3rem">🎉</div>
       <div class="score-big" id="doneStat"></div>
       <div class="score-sub" id="doneSub"></div>
-      <button class="btn primary" id="btnAgain">再練不熟的</button>
+      <button class="btn primary" id="btnAgain">去錯題複習</button>
       <div style="height:10px"></div>
       <a class="btn ghost" id="toMcq">去做選擇題</a>
       <div style="height:10px"></div>
@@ -69,14 +69,21 @@
   $("#subtitle").textContent = deckLabel(deck);
 
   const LIMIT = 20;
-  let queue = dueWords(deck).slice(0, LIMIT);
-  const onlyHard = qs("hard") === "1";
-  if (onlyHard) queue = deckWords(deck).filter(w => getProg(w.en).box <= 1 && !isNew(w)).slice(0, LIMIT);
-  // 今天沒有到期的字就自由練習
-  let freeMode = false;
-  if (!queue.length){
-    queue = sampleN(deckWords(deck), LIMIT);
-    freeMode = queue.length > 0;
+  const wrongMode = qs("mode") === "wrong";
+  let queue, freeMode = false;
+  if (wrongMode){
+    queue = wrongWords(deck).slice(0, LIMIT);
+    $("#title").textContent = "📕 錯題字卡";
+    $("#backLink").href = "wrong.html";
+    $("#toMcq").href = "mcq.html?mode=wrong";
+    $("#toMcq").textContent = "去做錯題選擇題";
+  } else {
+    queue = dueWords(deck).slice(0, LIMIT);
+    // 今天沒有到期的字就自由練習
+    if (!queue.length){
+      queue = sampleN(deckWords(deck), LIMIT);
+      freeMode = queue.length > 0;
+    }
   }
 
   let cur = 0, good = 0, bad = 0, revealed = false;
@@ -84,8 +91,9 @@
   if (!queue.length){
     $("#stage").classList.add("hidden");
     $("#done").classList.remove("hidden");
-    $("#doneStat").textContent = "還沒有單字";
-    $("#doneSub").textContent = "先去「新增單字」加幾個字吧";
+    $("#doneStat").textContent = wrongMode ? "沒有錯題" : "還沒有單字";
+    $("#doneSub").textContent = wrongMode
+      ? "答錯的字會自動收集到這裡" : "先去「新增單字」加幾個字吧";
     $("#btnAgain").classList.add("hidden");
     return;
   }
@@ -162,7 +170,7 @@
   $("#btnFuzzy").onclick = () => mark(1);
   $("#btnNo").onclick    = () => mark(0);
   $("#speakBtn").onclick = e => { e.stopPropagation(); speak(queue[cur].en); };
-  $("#btnAgain").onclick = () => location.href = "cards.html" + (suffix ? suffix + "&hard=1" : "?hard=1");
+  $("#btnAgain").onclick = () => location.href = "wrong.html";
   render();
 })();
 </script>

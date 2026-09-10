@@ -148,14 +148,27 @@ function deleteWord(id){
 const BOX_DAYS = [0, 1, 2, 4, 8, 16];      // box 0 = 新字／今天再看一次
 const MAX_BOX  = BOX_DAYS.length - 1;
 
-function today(){
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+/* 全部時間都用台灣時間（UTC+8），出國讀書時「今天」的定義才不會跟著跳。 */
+const TZ_MIN = 8 * 60;
+function twNow(t){
+  const d = t ? new Date(t) : new Date();
+  return new Date(d.getTime() + (TZ_MIN + d.getTimezoneOffset()) * 60000);
 }
+const p2 = n => String(n).padStart(2, "0");
+function ymd(d){ return d.getFullYear() + "-" + p2(d.getMonth()+1) + "-" + p2(d.getDate()); }
+function hm(d){ return p2(d.getHours()) + ":" + p2(d.getMinutes()); }
+
+function today(){ return ymd(twNow()); }
 function addDays(n){
-  const d = new Date();
+  const d = twNow();
   d.setDate(d.getDate() + n);
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  return ymd(d);
+}
+/* 顯示用：一筆測驗紀錄的台灣時間。ts 是新格式，舊紀錄的 d 是 UTC 字串。 */
+function stampOf(r){
+  if (r.ts) return ymd(twNow(r.ts)) + " " + hm(twNow(r.ts));
+  const d = twNow(new Date(String(r.d).slice(0,16) + ":00Z").getTime());
+  return isNaN(d) ? String(r.d).replace("T", " ") : ymd(d) + " " + hm(d);
 }
 function getProg(en){
   const p = loadDB().prog[key(en)];
@@ -215,7 +228,8 @@ function deckStats(deckId){
 /* ---------- 測驗紀錄 ---------- */
 function addQuizResult(mode, s, t, deck){
   const db = loadDB();
-  db.quiz.push({d:new Date().toISOString().slice(0,16), mode, s, t, deck: deck || "all"});
+  const now = twNow();
+  db.quiz.push({d: ymd(now) + "T" + hm(now), ts: Date.now(), mode, s, t, deck: deck || "all"});
   if (db.quiz.length > 100) db.quiz = db.quiz.slice(-100);
   saveDB(db);
 }
@@ -229,13 +243,26 @@ function streak(){
   db.quiz.forEach(q => days.add(String(q.d).slice(0,10)));
   let n = 0;
   for (let i = 0; ; i++){
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const s = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-    if (days.has(s)) n++;
+    const d = twNow(); d.setDate(d.getDate() - i);
+    if (days.has(ymd(d))) n++;
     else if (i > 0) break;          // 今天還沒學不算斷
   }
   return n;
 }
+
+/* ---------- 錯題 ----------
+   答錯過、而且還沒練熟（box < 3）的字。錯越多次、box 越低的排越前面。 */
+function wrongWords(deckId){
+  const db = loadDB();
+  return deckWords(deckId)
+    .map(w => ({w, p: db.prog[key(w.en)]}))
+    .filter(x => x.p && x.p.wrong > 0 && x.p.box < 3)
+    .sort((a, b) => a.p.box - b.p.box
+                 || b.p.wrong - a.p.wrong
+                 || String(b.p.last).localeCompare(String(a.p.last)))
+    .map(x => x.w);
+}
+function wrongCount(deckId){ return wrongWords(deckId).length; }
 
 /* ---------- 工具 ---------- */
 function shuffle(arr){

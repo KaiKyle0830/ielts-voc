@@ -49,6 +49,11 @@
     <span><span class="t">拼字題</span><br><span class="d">看中文和例句，把英文拼出來</span></span>
     <span class="go">›</span>
   </a>
+  <a class="bigbtn" id="btnWrong" href="wrong.html">
+    <span class="emoji">📕</span>
+    <span><span class="t">錯題複習</span><br><span class="d" id="wrongDesc">答錯的字會收集在這裡</span></span>
+    <span class="go">›</span>
+  </a>
   <a class="bigbtn" id="btnList" href="list.html">
     <span class="emoji">📋</span>
     <span><span class="t">單字表</span><br><span class="d" id="listDesc">看全部單字、例句與熟練度</span></span>
@@ -113,9 +118,15 @@
     : (st.total ? "今天的複習都完成了，可以自由練習" : "滑開遮版看英文");
   $("#listDesc").textContent = st.total ? `${st.total} 個單字・${deckLabel(deck)}` : "看全部單字、例句與熟練度";
 
+  const nWrong = wrongCount(deck);
+  $("#wrongDesc").textContent = nWrong
+    ? `${nWrong} 個答錯過的字，專門練這些`
+    : "答錯的字會自動收集在這裡";
+  if (!nWrong) $("#btnWrong").setAttribute("disabled", "");
+
   if (!st.total){
     $("#emptyHint").style.display = "";
-    ["#btnStudy","#btnMcq","#btnSpell","#btnList"].forEach(s => $(s).setAttribute("disabled",""));
+    ["#btnStudy","#btnMcq","#btnSpell","#btnList","#btnWrong"].forEach(s => $(s).setAttribute("disabled",""));
   }
 
   const q = quizHistory().slice(-5).reverse();
@@ -123,7 +134,7 @@
     $("#recent").style.display = "";
     const label = {mcq:"選擇題", spell:"拼字題", cards:"字卡"};
     $("#recentList").innerHTML = q.map(r =>
-      `<div class="row"><span class="small">${esc(String(r.d).replace("T"," "))}</span>
+      `<div class="row"><span class="small">${esc(stampOf(r))}</span>
        <span class="badge">${esc(label[r.mode] || r.mode)}</span>
        <b style="margin-left:auto">${r.s} / ${r.t}</b></div>`).join("");
   }

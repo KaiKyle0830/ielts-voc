@@ -12,8 +12,8 @@
 <body>
 <main>
   <div class="top">
-    <a class="back" href="index.html">‹</a>
-    <div><h1>📝 選擇題</h1><div class="sub" id="subtitle"></div></div>
+    <a class="back" id="backLink" href="index.html">‹</a>
+    <div><h1 id="title">📝 選擇題</h1><div class="sub" id="subtitle"></div></div>
   </div>
 
   <div id="stage">
@@ -50,25 +50,42 @@
   $("#subtitle").textContent = deckLabel(deck);
   $("#toSpell").href = "spell.html" + suffix;
 
-  const pool = deckWords(deck);
-  const wide = allWords();
-  if (pool.length < 2){
+  const wrongMode = qs("mode") === "wrong";
+  const pool = wrongMode ? wrongWords(deck) : deckWords(deck);
+  const wide = allWords();          // 錯題只有幾個字時，干擾選項從全部單字裡找
+  if (!pool.length || wide.length < 2){
     $("#stage").classList.add("hidden");
     $("#done").classList.remove("hidden");
-    $("#doneStat").textContent = "單字不夠";
-    $("#doneSub").textContent = "至少要 2 個單字才能出選擇題";
+    $("#doneStat").textContent = wrongMode ? "沒有錯題" : "單字不夠";
+    $("#doneSub").textContent = wrongMode
+      ? "答錯的字會自動收集到這裡" : "至少要 2 個單字才能出選擇題";
     return;
   }
+  if (wrongMode){
+    $("#title").textContent = "📕 錯題・選擇題";
+    $("#backLink").href = "wrong.html";
+    $("#toSpell").href = "spell.html?mode=wrong";
+    $("#toSpell").textContent = "換錯題拼字";
+  }
 
-  // 優先考今天到期的字，湊不滿再從全部裡抽
   const N = Math.min(10, pool.length);
-  let picked = dueWords(deck).slice(0, N);
-  if (picked.length < N){
-    const have = new Set(picked.map(w => w.id));
-    picked = picked.concat(sampleN(pool.filter(w => !have.has(w.id)), N - picked.length));
+  let picked;
+  if (wrongMode){
+    picked = pool.slice(0, N);                    // 錯最多、最不熟的先考
+  } else {
+    // 優先考今天到期的字，湊不滿再從全部裡抽
+    picked = dueWords(deck).slice(0, N);
+    if (picked.length < N){
+      const have = new Set(picked.map(w => w.id));
+      picked = picked.concat(sampleN(pool.filter(w => !have.has(w.id)), N - picked.length));
+    }
   }
   const quiz = shuffle(picked).map(makeQ);
   let cur = 0, right = 0, answered = false;
+
+  // 防彈跳：答案揭曉後 0.5 秒內按不動「下一題」，免得手快跳過沒看到答案
+  const SETTLE = 500;
+  let answeredAt = 0;
 
   function distractors(w, field){
     const same = pool.filter(x => x.id !== w.id && (x[field] || "").trim());
@@ -107,6 +124,8 @@
     $$("#opts .opt").forEach(b => b.onclick = () => choose(b, q));
     $("#feedback").classList.add("hidden");
     $("#btnNext").classList.add("hidden");
+    $("#btnNext").disabled = false;
+    $("#btnNext").textContent = "下一題";
     if (q.type === "en2zh") speak(q.w.en);
   }
   function choose(btn, q){
@@ -129,10 +148,19 @@
       (w.exZh ? `<br><span class="muted">${esc(w.exZh)}</span>` : "") +
       (w.note ? `<br><span class="muted">💡 ${esc(w.note)}</span>` : "");
     speak(w.en);
-    $("#btnNext").textContent = cur === quiz.length - 1 ? "看結果" : "下一題";
+    answeredAt = Date.now();
+    const label = cur === quiz.length - 1 ? "看結果" : "下一題";
+    $("#btnNext").textContent = label;
+    $("#btnNext").disabled = true;
     $("#btnNext").classList.remove("hidden");
+    setTimeout(() => {
+      if (!answered) return;
+      $("#btnNext").disabled = false;
+      $("#btnNext").textContent = label + "（Enter）";
+    }, SETTLE);
   }
-  $("#btnNext").onclick = () => {
+  function goNext(){
+    if (!answered || Date.now() - answeredAt < SETTLE) return;
     cur++;
     if (cur >= quiz.length){
       addQuizResult("mcq", right, quiz.length, deck);
@@ -143,7 +171,18 @@
       return;
     }
     render();
-  };
+  }
+  $("#btnNext").onclick = goNext;
+  // 鍵盤：1～4 選答案，Enter 換下一題
+  document.addEventListener("keydown", e => {
+    if (e.isComposing) return;
+    if (e.key === "Enter"){ e.preventDefault(); goNext(); return; }
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= 4 && !answered){
+      const b = $$("#opts .opt")[n-1];
+      if (b) b.click();
+    }
+  });
   render();
 })();
 </script>

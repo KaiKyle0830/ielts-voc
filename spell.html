@@ -12,8 +12,8 @@
 <body>
 <main>
   <div class="top">
-    <a class="back" href="index.html">‹</a>
-    <div><h1>✏️ 拼字題</h1><div class="sub" id="subtitle"></div></div>
+    <a class="back" id="backLink" href="index.html">‹</a>
+    <div><h1 id="title">✏️ 拼字題</h1><div class="sub" id="subtitle"></div></div>
   </div>
 
   <div id="stage">
@@ -58,22 +58,38 @@
   $("#subtitle").textContent = deckLabel(deck);
   $("#toMcq").href = "mcq.html" + deckParam(deck);
 
-  const pool = deckWords(deck);
+  const wrongMode = qs("mode") === "wrong";
+  const pool = wrongMode ? wrongWords(deck) : deckWords(deck);
   if (!pool.length){
     $("#stage").classList.add("hidden");
     $("#done").classList.remove("hidden");
-    $("#doneStat").textContent = "還沒有單字";
-    $("#doneSub").textContent = "先去「新增單字」加幾個字";
+    $("#doneStat").textContent = wrongMode ? "沒有錯題" : "還沒有單字";
+    $("#doneSub").textContent = wrongMode ? "答錯的字會自動收集到這裡" : "先去「新增單字」加幾個字";
     return;
   }
+  if (wrongMode){
+    $("#title").textContent = "📕 錯題・拼字";
+    $("#backLink").href = "wrong.html";
+    $("#toMcq").href = "mcq.html?mode=wrong";
+    $("#toMcq").textContent = "換錯題選擇題";
+  }
   const N = Math.min(10, pool.length);
-  let picked = dueWords(deck).slice(0, N);
-  if (picked.length < N){
-    const have = new Set(picked.map(w => w.id));
-    picked = picked.concat(sampleN(pool.filter(w => !have.has(w.id)), N - picked.length));
+  let picked;
+  if (wrongMode){
+    picked = pool.slice(0, N);                    // 錯最多、最不熟的先考
+  } else {
+    picked = dueWords(deck).slice(0, N);
+    if (picked.length < N){
+      const have = new Set(picked.map(w => w.id));
+      picked = picked.concat(sampleN(pool.filter(w => !have.has(w.id)), N - picked.length));
+    }
   }
   const quiz = shuffle(picked);
   let cur = 0, right = 0, checked = false, hintLevel = 0;
+
+  // 防彈跳：答案揭曉後 0.5 秒內的 Enter／點擊一律不算，免得手快直接跳過沒看到答案
+  const SETTLE = 500;
+  let checkedAt = 0;
 
   const norm = s => s.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -88,9 +104,10 @@
       : (w.exZh ? esc(w.exZh) : "");
     $("#hint").textContent = "";
     $("#input").value = "";
-    $("#input").disabled = false;
+    $("#input").readOnly = false;
     $("#feedback").classList.add("hidden");
     $("#btnCheck").textContent = "檢查";
+    $("#btnCheck").disabled = false;
     $("#input").focus();
   }
   $("#btnHint").onclick = () => {
@@ -102,7 +119,12 @@
   $("#btnSpeak").onclick = () => speak(quiz[cur].en);
 
   function check(){
-    if (checked){ next(); return; }
+    if (checked){
+      // 剛揭曉答案的 0.5 秒內不換題，給眼睛時間看清楚錯在哪
+      if (Date.now() - checkedAt < SETTLE) return;
+      next();
+      return;
+    }
     const w = quiz[cur];
     const ok = norm($("#input").value) === norm(w.en);
     // 用了提示就算「有點模糊」，不給滿分
@@ -116,8 +138,17 @@
       (w.note ? `<br><span class="muted">💡 ${esc(w.note)}</span>` : "");
     speak(w.en);
     checked = true;
-    $("#input").disabled = true;
-    $("#btnCheck").textContent = cur === quiz.length - 1 ? "看結果" : "下一題";
+    checkedAt = Date.now();
+    // 不用 disabled，否則 input 收不到鍵盤事件，第二次 Enter 會沒反應
+    $("#input").readOnly = true;
+    const label = cur === quiz.length - 1 ? "看結果" : "下一題";
+    $("#btnCheck").textContent = label;
+    $("#btnCheck").disabled = true;                    // 0.5 秒內按不動，避免誤觸
+    setTimeout(() => {
+      if (!checked) return;                            // 已經換題就不用管了
+      $("#btnCheck").disabled = false;
+      $("#btnCheck").textContent = label + "（Enter）";
+    }, SETTLE);
   }
   function next(){
     cur++;
@@ -132,7 +163,12 @@
     render();
   }
   $("#btnCheck").onclick = check;
-  $("#input").addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+  // 掛在 document 上，這樣答案揭曉後（輸入框已 readOnly、可能也失焦）Enter 一樣有效
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Enter" || e.isComposing) return;
+    e.preventDefault();
+    check();
+  });
   render();
 })();
 </script>
