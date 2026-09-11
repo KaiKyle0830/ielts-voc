@@ -56,6 +56,9 @@ async def main():
 
     AUDIO_DIR.mkdir(exist_ok=True)
     texts = collect_texts()
+    if not texts:
+        print("seed.js 沒有單字，發音索引維持原狀")
+        return
     todo = [(t, AUDIO_DIR / (key_of(t) + ".mp3")) for t in texts]
     if not args.force:
         todo = [(t, p) for t, p in todo if not p.exists()]

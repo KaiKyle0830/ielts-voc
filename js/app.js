@@ -17,7 +17,7 @@ DB = {
 }
 ------------------------------------- */
 
-const DEFAULT_DB = { v:1, seedVersion:0, decks:[], words:[], prog:{}, quiz:[], settings:{}, gone:{} };
+const DEFAULT_DB = { v:1, seedVersion:0, decks:[], words:[], prog:{}, quiz:[], settings:{}, gone:{}, goneDecks:{} };
 
 function loadDB(){
   let db;
@@ -27,6 +27,7 @@ function loadDB(){
   db.prog = db.prog || {};   db.quiz  = db.quiz  || [];
   db.settings = db.settings || {};
   db.gone = db.gone || {};
+  db.goneDecks = db.goneDecks || {};
   return db;
 }
 function saveDB(db){ localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
@@ -36,6 +37,20 @@ function setSetting(k, v){
   saveDB(db);
 }
 
+/* 刪掉一整個牌組（含單字、進度），並留墓碑讓同步不會把它從另一台裝置救回來 */
+function dropDeckIn(db, id){
+  const now = Date.now();
+  db.gone = db.gone || {};
+  db.goneDecks = db.goneDecks || {};
+  db.words.filter(w => w.deck === id).forEach(w => {
+    db.gone[key(w.en)] = now;
+    delete db.prog[key(w.en)];
+  });
+  db.words = db.words.filter(w => w.deck !== id);
+  if (db.decks.some(d => d.id === id)) db.goneDecks[id] = now;
+  db.decks = db.decks.filter(d => d.id !== id);
+}
+
 /* 第一次開啟（或 seed 檔更新）時，把 data/seed.js 的單字併進來 */
 function syncSeed(){
   const seed = window.SEED_WORDS || [];
@@ -43,6 +58,18 @@ function syncSeed(){
   const db = loadDB();
   if (!db.decks.length) db.decks = [{id:"my", name:"我的單字", icon:"📘"}];
   if (ver <= db.seedVersion) return db;
+
+  // 一次性整理（seed.js 的 SEED_MIGRATE）：只在版本升上來的那一次執行，
+  // 電腦和手機各跑一次，結果一樣；刪掉的東西留墓碑，同步不會復活
+  const mig = window.SEED_MIGRATE;
+  if (mig && (mig.v || 0) > (db.seedVersion || 0)){
+    (mig.dropDecks || []).forEach(id => dropDeckIn(db, id));
+    Object.entries(mig.renameDecks || {}).forEach(([from, to]) => {
+      db.decks.forEach(d => { if (d.name === from) d.name = to; });
+    });
+    if (mig.resetCurDeck) delete db.settings.deck;   // 選中的牌組被刪了就回到「全部」
+  }
+
   const have = new Set(db.words.map(w => key(w.en)));
   const gone = db.gone || {};
   let added = 0;
@@ -109,8 +136,7 @@ function renameDeck(id, name, icon){
 }
 function deleteDeck(id){
   const db = loadDB();
-  db.decks = db.decks.filter(d => d.id !== id);
-  db.words = db.words.filter(w => w.deck !== id);
+  dropDeckIn(db, id);
   saveDB(db);
 }
 
@@ -452,3 +478,36 @@ function deckLabel(id){
   return d ? `${d.icon} ${d.name}` : "全部單字";
 }
 function deckParam(id){ return id && id !== "all" ? `?deck=${encodeURIComponent(id)}` : ""; }
+
+/* ---------- 自動更新 ----------
+   GitHub Pages 的 CDN 會把網頁快取 10 分鐘，瀏覽器又會把 JS/CSS 存更久，
+   所以推了新版之後常常要重新整理好幾次才看得到。改成 App 自己去問
+   version.json（每次帶不同的 ?t= 繞過快取）有沒有新版本，有就自己重新載入一次。 */
+let _updateShown = false;
+async function checkUpdate(autoReload){
+  if (!window.APP_BUILD) return;
+  try {
+    const r = await fetch("version.json?t=" + Date.now(), {cache: "no-store"});
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.build || j.build === window.APP_BUILD) return;
+    // 這一頁已經是帶著新版本號載入的，代表 CDN 上的 HTML 還沒換過來，不要一直轉圈
+    if (qs("v") === j.build) return;
+    if (autoReload){
+      const u = new URL(location.href);
+      u.searchParams.set("v", j.build);
+      location.replace(u.toString());
+    } else if (!_updateShown){
+      _updateShown = true;
+      toast("有新版本，回首頁會自動更新", 3000);
+    }
+  } catch(e){}
+}
+if (typeof window !== "undefined"){
+  // 練習中途不要突然重新載入，只提醒；其他頁面直接換新版
+  const practicing = /cards|mcq|spell/.test(location.pathname);
+  addEventListener("load", () => checkUpdate(!practicing));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkUpdate(!practicing);
+  });
+}

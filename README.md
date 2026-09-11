@@ -5,9 +5,13 @@
 
 ## 平常怎麼用
 
-**加新單字（主要流程）**
+**加新單字**
 
-在 Claude Code 對話裡直接說就好：
+使用者目前是自己在 App 裡加字（「新增單字」→ 貼上單字 → 複製指令給 Claude → 貼回 JSON → 匯入），
+牌組自己建（目前有「Sep 10」「Sep 11」）。資料在瀏覽器＋gist，不在 repo。
+2026-09-11 已把 repo 裡預先準備的 127 個雅思字全部移除。
+
+如果要 Claude Code 直接寫進 repo，在對話裡說就好：
 
 > 幫我加這幾個字到單字本：resilient、advocate、mitigate
 
@@ -129,6 +133,25 @@ token 只存在各裝置的 localStorage，不會進 repo，也不會傳到 GitH
 設定頁 → 進階，填入 Anthropic API key（`console.anthropic.com` 申請）之後，
 「新增單字」頁會多一顆「直接自動生成」，不用再複製貼上。
 key 只存在這台裝置的瀏覽器，不會傳到其他地方。平常不填也完全能用。
+
+## 上線與自動更新
+
+推上線一律用：
+
+```bash
+gen/deploy.sh "commit 訊息"
+```
+
+它會依序：`check.py` 檢查資料 → `generate_audio.py` 補發音 → `stamp.py` 蓋版本章 → commit → push。
+
+**版本章**（`gen/stamp.py`）解決「推了新版要重新整理好幾次才看得到」：
+- 所有 HTML 的 `js/`、`css/`、`data/` 引用都帶 `?v=<版本>`，HTML 一換，資源一定重抓
+- 產生 `version.json`，App 每次打開（和切回前景時）帶 `?t=時間` 去問有沒有新版，
+  有就自己帶 `?v=新版` 重新載入一次（繞過 GitHub Pages 的 10 分鐘 CDN 快取）
+- 練習中途（字卡／選擇題／拼字）不會突然重載，只提示「回首頁會更新」
+
+**一次性整理**（`data/seed.js` 的 `SEED_MIGRATE`）：要幫使用者刪牌組、改名時用，
+`v` 對到 `SEED_VERSION`，每台裝置只執行一次；刪掉的東西留墓碑（`gone`／`goneDecks`），同步不會復活。
 
 ## 本機預覽
 

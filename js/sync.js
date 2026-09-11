@@ -51,7 +51,8 @@ function syncPayload(){
     words: db.words,
     prog: db.prog,
     quiz: db.quiz,
-    gone: db.gone || {}
+    gone: db.gone || {},
+    goneDecks: db.goneDecks || {}
   };
 }
 function deviceName(){
@@ -103,9 +104,13 @@ function mergeRemote(remote){
     if (newer){ db.prog[k] = rp; nProg++; }
   });
 
-  // 牌組：以 id 聯集
+  // 牌組：以 id 聯集，但被刪掉的（墓碑）不加回來
+  const goneDecks = Object.assign({}, remote.goneDecks || {}, db.goneDecks || {});
+  db.goneDecks = goneDecks;
+  db.decks = db.decks.filter(d => !goneDecks[d.id]);
   const deckIds = new Set(db.decks.map(d => d.id));
   (remote.decks || []).forEach(d => {
+    if (goneDecks[d.id]) return;
     if (!deckIds.has(d.id)){ db.decks.push(d); deckIds.add(d.id); }
   });
 

@@ -8,8 +8,11 @@ SEED = ROOT / "data" / "seed.js"
 
 def load_words():
     text = SEED.read_text(encoding="utf-8")
-    body = text[text.index("SEED_WORDS"):]
-    body = body[body.index("["): body.rindex("]") + 1]
+    m = re.search(r"window\.SEED_WORDS\s*=\s*\[", text)
+    if not m:
+        return []
+    body = text[m.end() - 1:]
+    body = body[: body.rindex("]") + 1]
     body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)                 # 去掉註解
     body = re.sub(r"([{,]\s*)([A-Za-z_]\w*)\s*:", r'\1"\2":', body)   # 鍵補引號
     body = re.sub(r",\s*([}\]])", r"\1", body)                        # 去掉多餘逗號

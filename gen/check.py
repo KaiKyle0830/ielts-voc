@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """檢查 data/seed.js：欄位齊全、例句真的含該單字、沒有重複字。"""
-import json, re, sys, pathlib
+import re, sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from seedlib import load_words, seed_version
 
-src = pathlib.Path(__file__).resolve().parent.parent / "data" / "seed.js"
-text = src.read_text(encoding="utf-8")
-
-ver = re.search(r"SEED_VERSION\s*=\s*(\d+)", text)
-body = text[text.index("SEED_WORDS"):]
-body = body[body.index("["): body.rindex("]") + 1]
-body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)          # 去掉註解
-body = re.sub(r"([{,]\s*)([A-Za-z_]\w*)\s*:", r'\1"\2":', body)  # 鍵補上引號
-body = re.sub(r",\s*([}\]])", r"\1", body)                  # 去掉結尾多餘逗號
-words = json.loads(body)
+words = load_words()
+ver = seed_version()
 
 errs, warns = [], []
 seen = {}
@@ -62,7 +56,7 @@ for w in words:
         if not w.get("deckName"):
             errs.append(f'牌組 {d}：第一筆 ({w.get("en")}) 少了 deckName／deckIcon')
 
-print(f"SEED_VERSION = {ver.group(1) if ver else '?'}　共 {len(words)} 個單字")
+print(f"SEED_VERSION = {ver}　共 {len(words)} 個單字")
 for d, n in decks.items():
     f = first[d]
     print(f'  {f.get("deckIcon","?")} {f.get("deckName",d):<10} {d:<8} {n:>3} 字')
