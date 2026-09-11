@@ -38,6 +38,8 @@ const AI_SYSTEM =
 - ex：一個英文例句，8～16 個字，日常實用、句意能看出這個字的意思，句中必須實際出現這個單字（可用時態或單複數變化）
 - exZh：例句的繁體中文翻譯，自然通順
 - note：一句話的用法提示、常見搭配或易混淆字；沒特別可講就給空字串
+- syn：2～3 個相似字，格式「word 中文；word 中文」，挑雅思程度、真的可以互換的
+- ant：1～2 個相反字，同樣格式；沒有明顯相反字就給空字串
 
 規則：
 - 只輸出 JSON 陣列，不要任何說明文字，不要 markdown 圍欄
@@ -50,7 +52,7 @@ function buildPrompt(items){
   return AI_SYSTEM + `
 
 輸出格式：
-[{"en":"...","pos":"...","zh":"...","ex":"...","exZh":"...","note":"..."}]
+[{"en":"...","pos":"...","zh":"...","ex":"...","exZh":"...","note":"...","syn":"...","ant":"..."}]
 
 單字：
 ` + list;
@@ -73,7 +75,9 @@ function parseWordsJSON(text){
     zh: String(w.zh || "").trim(),
     ex: String(w.ex || "").trim(),
     exZh: String(w.exZh || w.ex_zh || "").trim(),
-    note: String(w.note || "").trim()
+    note: String(w.note || "").trim(),
+    syn: String(w.syn || "").trim(),
+    ant: String(w.ant || "").trim()
   }));
 }
 
@@ -100,7 +104,7 @@ async function generateWithAPI(items){
       system: AI_SYSTEM,
       output_config: {effort: "low"},
       messages: [{role:"user", content:
-        `輸出格式：\n[{"en":"...","pos":"...","zh":"...","ex":"...","exZh":"...","note":"..."}]\n\n單字：\n` + list}]
+        `輸出格式：\n[{"en":"...","pos":"...","zh":"...","ex":"...","exZh":"...","note":"...","syn":"...","ant":"..."}]\n\n單字：\n` + list}]
     })
   });
   if (!res.ok){

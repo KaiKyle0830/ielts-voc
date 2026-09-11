@@ -87,6 +87,7 @@
       </div>
       <div style="margin-top:3px">${esc(w.zh)}</div>
       ${w.ex ? `<div class="wl-ex">${esc(w.ex)}${w.exZh ? "<br>" + esc(w.exZh) : ""}</div>` : ""}
+      ${relBlock(w)}
       <div class="wl-ex">熟練度：${esc(BOX_NAME[p.box])}・答對 ${p.right} 次</div>
     </div>`;
   }).join("");

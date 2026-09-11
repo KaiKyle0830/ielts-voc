@@ -148,7 +148,8 @@
       `<br><b>${esc(w.en)}</b> ${esc(w.pos)} ${esc(w.zh)}` +
       (w.ex ? `<br>${esc(w.ex)}` : "") +
       (w.exZh ? `<br><span class="muted">${esc(w.exZh)}</span>` : "") +
-      (w.note ? `<br><span class="muted">💡 ${esc(w.note)}</span>` : "");
+      (w.note ? `<br><span class="muted">💡 ${esc(w.note)}</span>` : "") +
+      relBlock(w);
     speak(w.en);
     answeredAt = Date.now();
     const label = cur === quiz.length - 1 ? "看結果" : "下一題";

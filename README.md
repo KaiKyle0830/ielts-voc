@@ -58,9 +58,16 @@ window.SEED_WORDS = [
    en:"benchmark", pos:"n./v.", zh:"基準；標竿",
    ex:"This model sets a new benchmark for speed.",
    exZh:"這個模型為速度立下新標竿。",
-   note:"benchmark against 意為以…為基準比較"},
+   note:"benchmark against 意為以…為基準比較",
+   syn:"standard 標準；yardstick 衡量標準",       // 相似字：「word 中文；word 中文」
+   ant:"",                                        // 相反字，沒有就空字串
+   added:"2026-09-11"},                           // 加入日期
 ];
 ```
+
+**相似字／相反字**（2026-09-11 起）：新加的字都要帶 `syn`（2～3 個）和 `ant`（1～2 個，沒有就空字串），
+格式「word 中文；word 中文」，用「；」分隔。字卡、單字表、答題回饋、錯題頁都會顯示成小標籤，點一下會發音。
+之前的 127 個字沒有這兩欄，不補（使用者說不用動）。`gen/check.py` 會檢查 `added >= 2026-09-11` 的字有沒有帶。
 
 匯入時以英文字為準：已經存在的字不會覆蓋，所以你在 App 裡改過的內容不會被蓋掉。
 

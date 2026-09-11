@@ -63,6 +63,8 @@
       <label class="f">例句</label><input class="inp" id="mEx">
       <label class="f">例句翻譯</label><input class="inp" id="mExZh">
       <label class="f">筆記</label><input class="inp" id="mNote">
+      <label class="f">相似字（word 中文；word 中文）</label><input class="inp" id="mSyn">
+      <label class="f">相反字</label><input class="inp" id="mAnt">
       <div style="height:14px"></div>
       <button class="btn ghost" id="btnManual">加入</button>
     </details>
@@ -137,6 +139,7 @@
             <span class="wl-pos">${esc(w.pos)}</span>
             <span class="wl-zh">${esc(w.zh)}</span></div>
           <div class="wl-ex">${esc(w.ex)}<br>${esc(w.exZh)}</div>
+          ${relBlock(w)}
         </div>`).join("");
   }
   $("#btnImport").onclick = () => {
@@ -156,8 +159,9 @@
     const en = $("#mEn").value.trim();
     if (!en){ toast("英文不能空白"); return; }
     importWords([{en, pos:$("#mPos").value, zh:$("#mZh").value, ex:$("#mEx").value,
-                  exZh:$("#mExZh").value, note:$("#mNote").value}], $("#deckSel").value);
-    ["#mEn","#mPos","#mZh","#mEx","#mExZh","#mNote"].forEach(s => $(s).value = "");
+                  exZh:$("#mExZh").value, note:$("#mNote").value,
+                  syn:$("#mSyn").value, ant:$("#mAnt").value}], $("#deckSel").value);
+    ["#mEn","#mPos","#mZh","#mEx","#mExZh","#mNote","#mSyn","#mAnt"].forEach(s => $(s).value = "");
     toast("已加入：" + en);
   };
 })();

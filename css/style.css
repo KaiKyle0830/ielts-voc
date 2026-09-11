@@ -154,3 +154,18 @@ select.inp{appearance:none;background-image:none}
 .steps li:before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;
   width:24px;height:24px;border-radius:99px;background:var(--accent);color:#fff;
   font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* 相似字／相反字標籤 */
+.rel{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px;font-size:.84rem;line-height:1.5}
+.rel-k{font-weight:800;font-size:.95rem;width:16px;text-align:center;flex:none}
+.rel.syn .rel-k{color:var(--good)}
+.rel.ant .rel-k{color:var(--bad)}
+.rel-i{display:inline-block;border-radius:8px;padding:2px 8px;background:var(--bg);color:var(--muted);cursor:pointer}
+.rel-i b{color:var(--text);font-weight:700}
+.rel.syn .rel-i{background:rgba(22,163,74,.10)}
+.rel.ant .rel-i{background:rgba(220,38,38,.09)}
+.fc-face .rel{justify-content:center;margin-top:4px}
+.fc-face .rel-i{background:var(--bg)}
+/* 字卡高度改由內容決定，多了相似字也放得下 */
+.fc-card{height:auto;min-height:330px}
+.fc-face{position:relative;inset:auto;min-height:330px}

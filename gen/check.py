@@ -42,6 +42,16 @@ for i, w in enumerate(words):
         warns.append(f"{tag}：例句偏長（{n} 字）")
     if not w.get("note"):
         warns.append(f"{tag}：沒有 note")
+    # 2026-09-11 起新加的字要帶相似字／相反字（舊字不補，他說不用動）
+    if w.get("added", "") >= "2026-09-11":
+        if not w.get("syn"):
+            errs.append(f"{tag}：新字缺 syn（相似字）")
+        if "ant" not in w:
+            errs.append(f"{tag}：新字缺 ant 欄位（沒有相反字就給空字串）")
+    for f in ("syn", "ant"):
+        v = w.get(f, "")
+        if v and not re.match(r"^[A-Za-z]", v):
+            errs.append(f'{tag}：{f} 要以英文開頭，格式「word 中文；word 中文」 → "{v}"')
 
 # 每個牌組的第一筆要帶 deckName / deckIcon
 first = {}

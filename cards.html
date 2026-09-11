@@ -26,6 +26,7 @@
           <button class="fc-speak" id="speakBtn" aria-label="發音">🔊</button>
           <div class="fc-ex" id="enEx"></div>
           <div class="fc-ex muted" id="enNote" style="font-size:.82rem"></div>
+          <div id="enRel" style="width:100%"></div>
         </div>
         <div class="fc-mask" id="mask">
           <div class="fc-word" id="zhWord"></div>
@@ -149,6 +150,7 @@
     $("#enPos").textContent  = w.pos || "";
     $("#enEx").innerHTML = w.ex ? esc(w.ex) + (w.exZh ? `<span class="zh">${esc(w.exZh)}</span>` : "") : "";
     $("#enNote").textContent = w.note || "";
+    $("#enRel").innerHTML = relBlock(w);
     const p = getProg(w.en);
     $("#boxHint").textContent = isNew(w) ? "第一次看到這個字"
       : `熟練度：${BOX_NAME[p.box]}・答對 ${p.right}／答錯 ${p.wrong}`;

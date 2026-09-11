@@ -9,7 +9,8 @@ DB = {
   v: 1,
   seedVersion: 0,                       // 已經吃進來的 data/seed.js 版本
   decks:  [{id, name, icon}],
-  words:  [{id, deck, en, pos, zh, ex, exZh, note, added}],
+  words:  [{id, deck, en, pos, zh, ex, exZh, note, syn, ant, added, at}],
+          //  syn／ant：相似字／相反字，格式「word 中文；word 中文」，2026-09-11 起的新字才有
   prog:   { "<en 小寫>": {box, due, seen, right, wrong, last} },
   quiz:   [{d, mode, s, t, deck}],
   settings: {}
@@ -75,6 +76,8 @@ function normalizeWord(w){
     ex:    String(w.ex || "").trim(),
     exZh:  String(w.exZh || "").trim(),
     note:  String(w.note || "").trim(),
+    syn:   String(w.syn || "").trim(),
+    ant:   String(w.ant || "").trim(),
     added: w.added || today(),
     at:    w.at || Date.now()
   };
@@ -123,7 +126,8 @@ function importWords(list, deckId){
     const old = idx.get(key(w.en));
     if (old){
       Object.assign(old, {pos:w.pos||old.pos, zh:w.zh||old.zh, ex:w.ex||old.ex,
-                          exZh:w.exZh||old.exZh, note:w.note||old.note, deck:w.deck,
+                          exZh:w.exZh||old.exZh, note:w.note||old.note,
+                          syn:w.syn||old.syn, ant:w.ant||old.ant, deck:w.deck,
                           at: Date.now()});
       updated++;
     } else {
@@ -287,6 +291,26 @@ function shuffle(arr){
 function sampleN(arr, n){ return shuffle(arr).slice(0, Math.min(n, arr.length)); }
 function qs(name){ return new URLSearchParams(location.search).get(name); }
 function esc(s){ const d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+
+/* 相似字／相反字：「word 中文；word 中文」→ 一串小標籤的 HTML */
+function relHTML(s, kind){
+  const items = String(s || "").split(/[;；]/).map(x => x.trim()).filter(Boolean);
+  if (!items.length) return "";
+  const mark = kind === "ant" ? "≠" : "≈";
+  return `<div class="rel ${kind}"><span class="rel-k">${mark}</span>` +
+    items.map(it => {
+      // 英文部分貪婪吃到最後一個字母為止，後面才是中文
+      const m = it.match(/^([A-Za-z][A-Za-z'’\- ]*[A-Za-z]|[A-Za-z])\s*(.*)$/);
+      const en = m ? m[1].trim() : it, zh = m ? m[2].trim() : "";
+      return `<span class="rel-i" data-en="${esc(en)}"><b>${esc(en)}</b>${zh ? " " + esc(zh) : ""}</span>`;
+    }).join("") + `</div>`;
+}
+function relBlock(w){ return relHTML(w.syn, "syn") + relHTML(w.ant, "ant"); }
+// 點相似字就唸出來（沒有錄音檔，會用裝置內建語音）
+document.addEventListener("click", e => {
+  const el = e.target.closest && e.target.closest(".rel-i");
+  if (el){ e.stopPropagation(); speak(el.dataset.en); }
+});
 
 /* 例句挖空：把目標單字換成底線，順便吃掉 -s/-ed/-ing 等變化。
    只在有詞邊界時才挖，免得 act 把 action 挖成「＿＿＿ion」。 */

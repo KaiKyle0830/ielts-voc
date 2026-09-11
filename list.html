@@ -39,6 +39,8 @@
       <label class="f">例句</label><textarea class="inp" id="eEx" style="min-height:70px"></textarea>
       <label class="f">例句翻譯</label><textarea class="inp" id="eExZh" style="min-height:70px"></textarea>
       <label class="f">筆記</label><input class="inp" id="eNote">
+      <label class="f">相似字（word 中文；word 中文）</label><input class="inp" id="eSyn">
+      <label class="f">相反字</label><input class="inp" id="eAnt">
       <div style="height:16px"></div>
       <div class="btnrow">
         <button class="btn ghost" id="eCancel">取消</button>
@@ -96,6 +98,7 @@
         <div style="margin-top:3px">${esc(w.zh)}</div>
         ${w.ex ? `<div class="wl-ex">${esc(w.ex)}${w.exZh ? "<br>" + esc(w.exZh) : ""}</div>` : ""}
         ${w.note ? `<div class="wl-ex">💡 ${esc(w.note)}</div>` : ""}
+        ${relBlock(w)}
       </div>`;
     }).join("");
     $$("#list .wl-item").forEach(el => {
@@ -116,13 +119,15 @@
     $("#edTitle").textContent = "編輯：" + w.en;
     $("#eEn").value = w.en; $("#ePos").value = w.pos; $("#eZh").value = w.zh;
     $("#eEx").value = w.ex; $("#eExZh").value = w.exZh; $("#eNote").value = w.note;
+    $("#eSyn").value = w.syn || ""; $("#eAnt").value = w.ant || "";
     $("#editor").classList.remove("hidden");
   }
   $("#eCancel").onclick = () => $("#editor").classList.add("hidden");
   $("#eSave").onclick = () => {
     updateWord(editing, {en:$("#eEn").value.trim(), pos:$("#ePos").value.trim(),
       zh:$("#eZh").value.trim(), ex:$("#eEx").value.trim(),
-      exZh:$("#eExZh").value.trim(), note:$("#eNote").value.trim()});
+      exZh:$("#eExZh").value.trim(), note:$("#eNote").value.trim(),
+      syn:$("#eSyn").value.trim(), ant:$("#eAnt").value.trim()});
     $("#editor").classList.add("hidden");
     toast("已儲存"); render();
   };
