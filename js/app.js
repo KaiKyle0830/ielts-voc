@@ -344,9 +344,13 @@ function blankOut(ex, en){
   if (!ex || !en) return ex || "";
   const w = en.trim();
   const q = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // 片語就整串比對，中間允許多個空白
+  // 片語就整串比對，中間允許多個空白；最後一個字允許 -s/-ed/-ing（strictly prohibit → strictly prohibited）
   if (/\s/.test(w)){
-    return ex.replace(new RegExp("\\b" + q(w).replace(/\s+/g, "\\s+") + "\\b", "i"), "＿＿＿");
+    const parts = w.split(/\s+/).map(q);
+    const last = parts.pop();
+    const lastStem = /e$/i.test(last) ? last.slice(0, -1) : last;
+    const re = "\\b" + parts.join("\\s+") + "\\s+(?:" + last + "(?:s|es|ed|d|ing)?|" + lastStem + "(?:ing|ed))\\b";
+    return ex.replace(new RegExp(re, "i"), "＿＿＿");
   }
   const pats = [q(w) + "(?:s|es|ed|d|ing|ly)?"];
   if (/e$/i.test(w))          pats.push(q(w.slice(0, -1)) + "(?:ing|ed)");      // make → making

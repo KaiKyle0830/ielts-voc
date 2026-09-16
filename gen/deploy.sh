@@ -3,9 +3,16 @@
 # 用法：gen/deploy.sh "commit 訊息"
 set -e
 cd "$(dirname "$0")/.."
-python3 gen/check.py
-python3 gen/generate_audio.py
-python3 gen/stamp.py
+
+# 優先用專案的 .venv（裡面有 edge-tts）；沒有就退回系統 python3
+if [ -x .venv/bin/python ]; then PY=.venv/bin/python
+elif python3 -c "1" >/dev/null 2>&1; then PY=python3
+else PY=/opt/homebrew/bin/python3.12; fi
+echo "使用 $PY"
+
+$PY gen/check.py
+$PY gen/generate_audio.py
+$PY gen/stamp.py
 git add -A
 git -c user.name="kylehuang20060830" -c user.email="kylehuang20060830@gmail.com" \
   commit -q -m "${1:-更新}

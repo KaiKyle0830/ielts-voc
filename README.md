@@ -84,7 +84,7 @@ window.SEED_WORDS = [
 **加完新單字一定要補產生發音**：
 
 ```bash
-pip3 install --user edge-tts        # 只需裝一次
+python3.12 -m venv .venv && .venv/bin/pip install edge-tts   # 只需裝一次
 python3 gen/check.py                # 先確認 seed.js 沒問題
 python3 gen/generate_audio.py       # 只會補產生缺少的
 ```
