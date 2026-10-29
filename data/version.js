@@ -1,2 +1,2 @@
 // 由 gen/stamp.py 自動產生
-window.APP_BUILD = "20261016.0104";
+window.APP_BUILD = "20261029.2315";
